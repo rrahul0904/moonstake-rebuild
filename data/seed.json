@@ -1,0 +1,56 @@
+{
+  "users": [],
+  "sessions": [],
+  "claims": [
+    {
+      "id": "claim_seed_orbitkit",
+      "userId": "system",
+      "brand": "OrbitKit",
+      "tagline": "Ship tiny tools with orbital ambition.",
+      "url": "https://example.com/orbitkit",
+      "sectors": ["S-18-10","S-19-10","S-18-11","S-19-11"],
+      "amount": 4,
+      "currency": "USD",
+      "createdAt": "2026-09-01T12:00:00.000Z"
+    },
+    {
+      "id": "claim_seed_cratercrm",
+      "userId": "system",
+      "brand": "CraterCRM",
+      "tagline": "Keep every customer in orbit.",
+      "url": "https://example.com/cratercrm",
+      "sectors": ["S-42-12","S-43-12","S-42-13"],
+      "amount": 3,
+      "currency": "USD",
+      "createdAt": "2026-09-02T12:00:00.000Z"
+    },
+    {
+      "id": "claim_seed_farside",
+      "userId": "system",
+      "brand": "FarSide AI",
+      "tagline": "Build where the signal is quiet.",
+      "url": "https://example.com/farside",
+      "sectors": ["S-50-21","S-51-21","S-52-21","S-50-22","S-51-22","S-52-22"],
+      "amount": 6,
+      "currency": "USD",
+      "createdAt": "2026-09-03T12:00:00.000Z"
+    },
+    {
+      "id": "claim_seed_lumabase",
+      "userId": "system",
+      "brand": "LumaBase",
+      "tagline": "A launchpad for bright ideas.",
+      "url": "https://example.com/lumabase",
+      "sectors": ["S-23-08","S-24-08"],
+      "amount": 2,
+      "currency": "USD",
+      "createdAt": "2026-09-04T12:00:00.000Z"
+    }
+  ],
+  "events": [
+    {"id":"ev1","type":"view","claimId":"claim_seed_orbitkit","createdAt":"2026-09-05T12:00:00.000Z"},
+    {"id":"ev2","type":"view","claimId":"claim_seed_orbitkit","createdAt":"2026-09-05T12:10:00.000Z"},
+    {"id":"ev3","type":"click","claimId":"claim_seed_orbitkit","createdAt":"2026-09-05T12:11:00.000Z"},
+    {"id":"ev4","type":"view","claimId":"claim_seed_farside","createdAt":"2026-09-05T13:00:00.000Z"}
+  ]
+}
