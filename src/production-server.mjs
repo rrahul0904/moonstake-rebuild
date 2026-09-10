@@ -4,9 +4,9 @@ import {
   authSignUp, authSignIn, authRefresh, authUser, authSignOut, getProfile,
   listClaims, listUnavailableSectorIds, reserveSectors, attachCheckoutSession,
   releaseReservation, processCheckoutCompleted, processCheckoutExpired, insertEvent,
-  updateModeration, assertSupabaseConfig
+  updateModeration, listAdminClaims, getAdminClaim, recordClaimRefund, assertSupabaseConfig
 } from './supabase.mjs';
-import { createCheckoutSession, verifyStripeSignature, assertStripeConfig } from './stripe.mjs';
+import { createCheckoutSession, createRefund, verifyStripeSignature, assertStripeConfig } from './stripe.mjs';
 
 const ACCESS_COOKIE='ms_access';
 const REFRESH_COOKIE='ms_refresh';
@@ -51,6 +51,8 @@ export async function handleProductionApi(req,res,url){
     return json(res,200,{received:true});
   }
 
+  if(req.method==='GET'&&url.pathname==='/api/health'){return json(res,200,{ok:true,service:'moonstake',mode:'production',time:new Date().toISOString()})}
+
   if(req.method==='GET'&&url.pathname==='/api/bootstrap'){
     const [rows,auth]=await Promise.all([listClaims(),sessionUser(req,res)]);const s=claimStats(rows);return json(res,200,{user:auth?.public||null,stats:{offices:s.offices,index:s.index,onBoard:s.onBoard,views:s.views,clickThroughs:s.clickThroughs,claimedSectors:s.claimedSectors},claims:s.claims,landmarks:LANDMARKS,paymentsMode:'stripe'});
   }
@@ -76,7 +78,23 @@ export async function handleProductionApi(req,res,url){
 
   if(req.method==='POST'&&(url.pathname==='/api/events/view'||url.pathname==='/api/events/click')){const body=await readBody(req);const claimId=String(body.claimId||'');const claims=claimStats(await listClaims()).claims;if(!claims.some(c=>c.id===claimId))return json(res,404,{error:'Claim not found'});const kind=url.pathname.endsWith('/click')?'click':'view';const fp=crypto.createHash('sha256').update(`${clientIp(req)}|${req.headers['user-agent']||''}`).digest('hex').slice(0,32);await insertEvent({claimId,kind,fingerprint:fp});return json(res,201,{ok:true})}
 
-  if(req.method==='POST'&&url.pathname==='/api/admin/moderate'){const auth=await sessionUser(req,res);if(!auth||!adminAllowed(auth.user.email))return json(res,403,{error:'Admin access required'});const body=await readBody(req);if(!['active','hidden','refunded'].includes(body.status))return json(res,400,{error:'Invalid moderation status'});await updateModeration({claimId:String(body.claimId||''),status:body.status,note:String(body.note||'').slice(0,500),actor:auth.user.email});return json(res,200,{ok:true})}
+  if(req.method==='GET'&&url.pathname==='/api/admin/claims'){
+    const auth=await sessionUser(req,res);if(!auth||!adminAllowed(auth.user.email))return json(res,403,{error:'Admin access required'});
+    return json(res,200,{claims:await listAdminClaims()});
+  }
+
+  if(req.method==='POST'&&url.pathname==='/api/admin/moderate'){
+    const auth=await sessionUser(req,res);if(!auth||!adminAllowed(auth.user.email))return json(res,403,{error:'Admin access required'});
+    const body=await readBody(req);if(!['active','hidden'].includes(body.status))return json(res,400,{error:'Invalid moderation status. Use /api/admin/refund for refunds.'});
+    await updateModeration({claimId:String(body.claimId||''),status:body.status,note:String(body.note||'').slice(0,500),actor:auth.user.email});return json(res,200,{ok:true});
+  }
+
+  if(req.method==='POST'&&url.pathname==='/api/admin/refund'){
+    const auth=await sessionUser(req,res);if(!auth||!adminAllowed(auth.user.email))return json(res,403,{error:'Admin access required'});
+    const body=await readBody(req);const claimId=String(body.claimId||'');const reason=String(body.reason||'requested_by_customer');const note=String(body.note||'').slice(0,500);
+    const claim=await getAdminClaim(claimId);if(!claim)return json(res,404,{error:'Claim not found'});if(claim.status==='refunded')return json(res,409,{error:'Claim is already refunded',refundId:claim.stripe_refund_id||null});if(!claim.stripe_payment_intent_id)return json(res,409,{error:'Claim has no Stripe payment intent to refund'});
+    try{const refund=await createRefund({claimId,paymentIntentId:claim.stripe_payment_intent_id,reason});await recordClaimRefund({claimId,refundId:refund.id,actor:auth.user.email,note});return json(res,200,{ok:true,refund:{id:refund.id,status:refund.status}})}catch(err){return json(res,409,{error:err.message})}
+  }
 
   return json(res,404,{error:'Not found'});
 }
