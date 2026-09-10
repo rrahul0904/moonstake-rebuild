@@ -63,7 +63,7 @@ export async function handleProductionApi(req,res,url){
     try{const data=await authSignUp(email,password,brand);if(!data?.session&&!data?.access_token)return json(res,201,{user:toPublicUser(data.user,{brand}),verificationRequired:true});const session=data.session||data;return json(res,201,{user:toPublicUser(data.user,{brand})},setSessionHeaders(session))}catch(err){return json(res,err.status===422?409:400,{error:err.message})}
   }
   if(req.method==='POST'&&url.pathname==='/api/auth/signin'){
-    if(!checkRateLimit(req,'signin',10))return json(res,429,{error:'Too many sign-in attempts. Try again later.'});const body=await readBody(req);try{const session=await authSignIn(String(body.email||'').trim().toLowerCase(),String(body.password||''));const profile=await getProfile(session.user.id);return json(res,200,{user:toPublicUser(session.user,profile)},setSessionHeaders(session))}catch{return json(res,401,{error:'Invalid email or password'})
+    if(!checkRateLimit(req,'signin',10))return json(res,429,{error:'Too many sign-in attempts. Try again later.'});const body=await readBody(req);try{const session=await authSignIn(String(body.email||'').trim().toLowerCase(),String(body.password||''));const profile=await getProfile(session.user.id);return json(res,200,{user:toPublicUser(session.user,profile)},setSessionHeaders(session))}catch{return json(res,401,{error:'Invalid email or password'})}
   }
   if(req.method==='POST'&&url.pathname==='/api/auth/signout'){const cookies=parseCookies(req);if(cookies[ACCESS_COOKIE])await authSignOut(cookies[ACCESS_COOKIE]);return json(res,200,{ok:true},{'set-cookie':clearCookies()})}
 
