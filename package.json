@@ -7,9 +7,9 @@
   "scripts": {
     "dev": "node --watch src/server.mjs",
     "start": "node src/server.mjs",
-    "start:production": "node src/production-entry.mjs",
     "test": "node --test tests/*.test.mjs",
-    "check": "node --check src/server.mjs && node --check src/production-entry.mjs && node --check src/production-server.mjs && node --check src/supabase.mjs && node --check src/stripe.mjs && node --check public/app.js && node --check public/checkout-bridge.js && node --check public/admin.js && node --check api/index.mjs"
+    "start:production": "node src/production-entry.mjs",
+    "check": "node --check src/server.mjs && node --check src/production-entry.mjs && node --check src/production-server.mjs && node --check src/production-common.mjs && node --check src/production-auth.mjs && node --check src/production-public.mjs && node --check src/production-payments.mjs && node --check src/production-admin.mjs && node --check src/supabase.mjs && node --check src/stripe.mjs && node --check public/app.js && node --check public/checkout-bridge.js && node --check public/admin.js && node --check api/index.mjs"
   },
   "engines": {
     "node": ">=20"
