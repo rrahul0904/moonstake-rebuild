@@ -14,8 +14,4 @@ jobs:
         with:
           node-version: 22
       - run: npm test
-      - run: node --check src/server.mjs
-      - run: node --check src/production-server.mjs
-      - run: node --check src/supabase.mjs
-      - run: node --check src/stripe.mjs
-      - run: node --check public/app.js
+      - run: npm run check
