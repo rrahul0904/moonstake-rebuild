@@ -111,3 +111,18 @@ export async function insertEvent({ claimId, kind, fingerprint='' }) {
 export async function updateModeration({ claimId, status, note, actor }) {
   return request('/rest/v1/rpc/moderate_claim', { method:'POST', body:{ p_claim_id:claimId, p_status:status, p_note:note || '', p_actor:actor } });
 }
+
+export async function listAdminClaims() {
+  return request('/rest/v1/claim_admin_directory?select=*&order=created_at.desc');
+}
+
+export async function getAdminClaim(claimId) {
+  const rows = await request(`/rest/v1/claim_admin_directory?id=eq.${encodeURIComponent(claimId)}&select=*`);
+  return rows?.[0] || null;
+}
+
+export async function recordClaimRefund({ claimId, refundId, actor, note='' }) {
+  return request('/rest/v1/rpc/record_claim_refund', { method:'POST', body:{
+    p_claim_id:claimId, p_refund_id:refundId, p_actor:actor, p_note:note
+  }});
+}
