@@ -1,6 +1,6 @@
 # Implementation status
 
-## Implemented and locally verified
+## Implemented and verified in code
 
 - Research-backed product surface inventory
 - Full lunar map UI, pan/zoom and responsive behavior
@@ -18,28 +18,36 @@
 - Webhook replay protection through `stripe_events`
 - Paid claim finalization only after verified payment
 - Checkout expiry and delayed-payment success/failure handling
-- Admin moderation endpoint and audit logging
-- Production/browser checkout bridge
+- Full Stripe refund execution with a stable idempotency key
+- Refund persistence (`stripe_refund_id`, `refunded_at`) and audit logging
+- Admin claim inventory, hide/restore controls and refund operator console at `/admin.html`
+- Distributed Postgres-backed signup/sign-in rate limiting
+- Strict origin checks, SameSite cookies, CSP and production HSTS
+- Production health endpoint
+- Dedicated Node/container production entrypoint
+- Vercel-native API adapter with raw body parsing disabled for signed webhooks
+- Vercel routing configuration
 - Docker packaging
 - GitHub Actions CI
-- Terms, privacy and refund-policy surfaces
-- 8 automated tests passing locally, including Stripe signature tampering/staleness tests
-- Node syntax checks passing for local and production entrypoints
+- Terms, privacy and refund-policy launch surfaces
+- 11 automated tests passing locally
+- Syntax checks passing for local server, production server, Vercel adapter and browser scripts
 
 ## Still incomplete before 100% production launch
 
 1. Provision a **dedicated Moonstake Supabase project**. Existing unrelated projects should not be reused.
-2. Apply `supabase/migrations/0001_production.sql` to that project and run Supabase security/performance advisors. Fix any findings.
-3. Configure Supabase production auth settings: email verification, redirect URLs and production site URL.
-4. Connect a Stripe sandbox, obtain a restricted server key and webhook signing secret, and register `/api/webhooks/stripe`.
-5. Run a real Stripe sandbox purchase end-to-end and verify reservation → payment → webhook → claim ownership.
-6. Run concurrent-purchase tests against the real Postgres project to prove the same sector cannot be sold twice.
-7. Implement **actual Stripe refund execution**. The current moderation state can mark a claim `refunded`, but it intentionally does not yet send a refund request to Stripe.
-8. Deploy the production process to a public host, configure production secrets and connect a domain.
-9. Run production browser/mobile smoke tests and abuse/security checks.
-10. Replace or augment the procedural lunar texture with an approved high-resolution NASA LRO WAC source if exact scientific-map fidelity is a launch requirement.
-11. Have final Terms/Privacy/Refund wording reviewed for the launch entity/jurisdiction.
+2. Apply migrations `0001_production.sql`, `0002_admin_refunds.sql` and `0003_distributed_rate_limits.sql` to that project.
+3. Run Supabase security and performance advisors against the real schema and fix every applicable finding.
+4. Configure Supabase production Auth: email verification, site URL and redirect allow-list.
+5. Connect a Stripe sandbox/live account, configure a restricted server key and register `/api/webhooks/stripe` with its signing secret.
+6. Run a real Stripe sandbox purchase end-to-end and prove reservation → Checkout → signed webhook → claim ownership.
+7. Run concurrent-purchase tests against the real Postgres project to prove two buyers cannot own the same sector.
+8. Deploy the GitHub project to Vercel, set production secrets and verify `/api/health`, static assets, auth and webhook routing.
+9. Attach the production domain/DNS and run desktop/mobile production browser smoke tests.
+10. Add an external bot/abuse challenge if launch traffic requires stronger automated abuse prevention than distributed rate limiting plus manual moderation.
+11. Replace/augment the procedural lunar texture with an approved high-resolution NASA LRO WAC source if scientific-map fidelity is a launch requirement.
+12. Have final Terms/Privacy/Refund wording reviewed for the actual launch entity and jurisdiction.
 
 ## Completion definition
 
-The repository is no longer just a demo: the core production architecture is implemented. It should **not** be described as 100% complete until the external production integrations above are provisioned and verified with real sandbox traffic.
+The product and its production adapters are now substantially implemented. It should **not** be described as 100% complete until the external Supabase, Stripe, Vercel and domain integrations are provisioned and verified with real sandbox traffic and concurrency tests.
