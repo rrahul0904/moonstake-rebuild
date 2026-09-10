@@ -126,3 +126,9 @@ export async function recordClaimRefund({ claimId, refundId, actor, note='' }) {
     p_claim_id:claimId, p_refund_id:refundId, p_actor:actor, p_note:note
   }});
 }
+
+export async function consumeRateLimit({ bucket, keyHash, limit, windowSeconds }) {
+  return request('/rest/v1/rpc/consume_rate_limit', { method:'POST', body:{
+    p_bucket:bucket, p_key_hash:keyHash, p_limit:limit, p_window_seconds:windowSeconds
+  }});
+}
