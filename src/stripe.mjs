@@ -47,6 +47,30 @@ export async function createCheckoutSession({ reservationId, amountCents, sector
   return data;
 }
 
+export async function createRefund({ claimId, paymentIntentId, reason='requested_by_customer' }) {
+  if (!process.env.STRIPE_SECRET_KEY) throw new Error('Stripe refund requires STRIPE_SECRET_KEY');
+  if (!claimId || !paymentIntentId) throw new Error('Stripe refund requires claim and payment intent IDs');
+  const allowed = new Set(['duplicate','fraudulent','requested_by_customer']);
+  if (!allowed.has(reason)) throw new Error('Invalid Stripe refund reason');
+  const form = new URLSearchParams();
+  form.set('payment_intent', paymentIntentId);
+  form.set('reason', reason);
+  form.set('metadata[claim_id]', claimId);
+  const res = await fetch(`${STRIPE_API}/refunds`, {
+    method:'POST',
+    headers:{
+      authorization:`Bearer ${process.env.STRIPE_SECRET_KEY}`,
+      'content-type':'application/x-www-form-urlencoded',
+      'idempotency-key':`moonstake-refund-${claimId}`
+    },
+    body:form
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data?.error?.message || `Stripe refund failed (${res.status})`);
+  if (!data?.id || !['pending','succeeded'].includes(data.status)) throw new Error('Stripe did not accept the refund');
+  return data;
+}
+
 export function verifyStripeSignature(rawBody, signatureHeader, secret=process.env.STRIPE_WEBHOOK_SECRET, toleranceSeconds=300, nowSeconds=Math.floor(Date.now()/1000)) {
   if (!secret || !signatureHeader) return false;
   const parts = String(signatureHeader).split(',').map(x => x.trim());
