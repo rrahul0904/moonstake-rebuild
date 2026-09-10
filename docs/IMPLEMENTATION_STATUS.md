@@ -27,11 +27,12 @@
 - Dedicated Node/container production entrypoint
 - Vercel-native API adapter with raw body parsing disabled for signed webhooks
 - Vercel routing configuration
+- Production API split into small, independently syntax-checked auth/public/payment/admin/common modules
 - Docker packaging
 - GitHub Actions CI
 - Terms, privacy and refund-policy launch surfaces
 - 11 automated tests passing locally
-- Syntax checks passing for local server, production server, Vercel adapter and browser scripts
+- Syntax checks passing for local server, production modules, Vercel adapter and browser scripts
 
 ## Still incomplete before 100% production launch
 
