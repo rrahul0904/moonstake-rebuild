@@ -28,19 +28,21 @@
 - Vercel-native API adapter with raw body parsing disabled for signed webhooks
 - Vercel routing configuration
 - Production API split into small, independently syntax-checked auth/public/payment/admin/common modules
+- Production environment preflight for HTTPS URLs, modern Supabase keys, Stripe secret shapes and admin configuration
+- Production operator runbook with credential-safe launch gates
 - Docker packaging
 - GitHub Actions CI
 - Terms, privacy and refund-policy launch surfaces
-- 11 automated tests passing locally
-- Syntax checks passing for local server, production modules, Vercel adapter and browser scripts
+- 14 automated tests passing locally (11 application/payment/Vercel tests + 3 production-preflight tests)
+- Syntax checks passing for local server, production modules, Vercel adapter, preflight and browser scripts
 
 ## Still incomplete before 100% production launch
 
-1. Provision a **dedicated Moonstake Supabase project**. Existing unrelated projects should not be reused.
+1. Provision a **dedicated Moonstake Supabase project**. Existing unrelated projects should not be reused. If the organization has reached its active-project quota, an operator must safely free capacity, upgrade the plan, or use another organization before provisioning can continue.
 2. Apply migrations `0001_production.sql`, `0002_admin_refunds.sql` and `0003_distributed_rate_limits.sql` to that project.
 3. Run Supabase security and performance advisors against the real schema and fix every applicable finding.
 4. Configure Supabase production Auth: email verification, site URL and redirect allow-list.
-5. Connect a Stripe sandbox/live account, configure a restricted server key and register `/api/webhooks/stripe` with its signing secret.
+5. Connect a Stripe sandbox account, configure a restricted server key and register `/api/webhooks/stripe` with its signing secret. Do not use live charging for release certification.
 6. Run a real Stripe sandbox purchase end-to-end and prove reservation → Checkout → signed webhook → claim ownership.
 7. Run concurrent-purchase tests against the real Postgres project to prove two buyers cannot own the same sector.
 8. Deploy the GitHub project to Vercel, set production secrets and verify `/api/health`, static assets, auth and webhook routing.
@@ -51,4 +53,4 @@
 
 ## Completion definition
 
-The product and its production adapters are now substantially implemented. It should **not** be described as 100% complete until the external Supabase, Stripe, Vercel and domain integrations are provisioned and verified with real sandbox traffic and concurrency tests.
+The product and its production adapters are substantially implemented. It should **not** be described as 100% complete until the external Supabase, Stripe, Vercel and domain integrations are provisioned and verified with real sandbox traffic and concurrency tests.
