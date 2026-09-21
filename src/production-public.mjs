@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import { LANDMARKS, quoteSectors } from './pricing.mjs';
 import { launchPlan } from './celestial-market.mjs';
-import { getMldMarketSummary, insertEvent, listClaims, listUnavailableSectorIds, recordMldLotEvent } from './supabase.mjs';
+import { getMldMarketSummary, insertEvent, listClaims, listMoonIndexHistory, listUnavailableSectorIds, recordMldLotEvent } from './supabase.mjs';
 import { boardFromClaims, claimStats, clientIp, json, readBody, sessionUser } from './production-common.mjs';
 
 export async function handlePublicApi(req, res, url) {
@@ -38,6 +38,15 @@ export async function handlePublicApi(req, res, url) {
       claims: s.claims,
       landmarks: LANDMARKS,
       paymentsMode: 'stripe',
+    });
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/index-history') {
+    const limit=Math.max(1,Math.min(500,Number(url.searchParams.get('limit'))||120));
+    return json(res,200,{
+      body:'moon',
+      formulaVersion:'moon-index-v1',
+      points:await listMoonIndexHistory(limit),
     });
   }
 
