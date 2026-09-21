@@ -154,3 +154,14 @@ export async function listAuthUsers() {
   const data = await request('/auth/v1/admin/users?page=1&per_page=1000');
   return Array.isArray(data?.users) ? data.users : [];
 }
+
+
+export async function listMldTransactions(limit=250) {
+  const safe = Math.max(1, Math.min(1000, Number(limit) || 250));
+  return request(`/rest/v1/mld_transactions?select=*&order=created_at.desc&limit=${safe}`);
+}
+
+export async function listMldOffers(limit=250) {
+  const safe = Math.max(1, Math.min(1000, Number(limit) || 250));
+  return request(`/rest/v1/mld_offers?select=*&order=created_at.desc&limit=${safe}`);
+}
