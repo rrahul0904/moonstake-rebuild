@@ -241,3 +241,10 @@ export async function getSellerPayoutReadiness(userId) {
     resale_payout_ready:false
   };
 }
+
+
+export async function recordMldLotEvent({ lotId, kind }) {
+  return request('/rest/v1/rpc/mld_record_lot_event', { method:'POST', body:{
+    p_lot_id:lotId, p_kind:kind
+  }});
+}
