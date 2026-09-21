@@ -31,7 +31,7 @@ export function normalizePlanetocentricLatitude(value){
   return lat;
 }
 
-export function normalizeUsqsGazetteerFeature(record,{includeNonAdopted=false}={}){
+export function normalizeUsgsGazetteerFeature(record,{includeNonAdopted=false}={}){
   if(!record || typeof record!=='object')throw new Error('feature record is required');
   const bodyId=String(record.bodyId||record.target||'').trim().toLowerCase();
   const body=getBody(bodyId);
