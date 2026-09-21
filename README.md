@@ -69,12 +69,13 @@ The Moon remains the launch market. The new `src/celestial-market.mjs` layer gen
 - solid bodies can use globally unique 720 × 360 angular lot IDs such as `MARS-360-180`
 - Moon pricing and MLD resale behavior remain backward compatible
 - Mars, Mercury, Venus, Ceres, Pluto, Europa and Titan are modeled as future surface markets
-- Jupiter, Saturn and the Sun are explicitly non-land inventory and use a separate observation-zone model
+- Jupiter, Saturn, Uranus, Neptune and the Sun are explicitly non-land inventory and use a separate observation-zone model
+- Earth is reference-only and is never sold as synthetic land
 - the launch plan is phased so adding inventory does not immediately fragment Moon liquidity
 - every body has its own index; a Solar Index can aggregate launched markets
 - scientific geography should come from NASA/JPL/PDS and USGS/IAU nomenclature sources
 
-See `docs/SOLAR_SYSTEM_EXPANSION.md`.
+See `docs/SOLAR_SYSTEM_EXPANSION.md`, `docs/INVENTORY_CATALOG.md`, `docs/PAYMENTS_AND_PAYOUTS.md`, and `docs/ADMIN_OPERATIONS.md`.
 
 
 ## Brand
