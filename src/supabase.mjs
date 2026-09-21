@@ -165,3 +165,79 @@ export async function listMldOffers(limit=250) {
   const safe = Math.max(1, Math.min(1000, Number(limit) || 250));
   return request(`/rest/v1/mld_offers?select=*&order=created_at.desc&limit=${safe}`);
 }
+
+
+export async function getMldLot(lotId) {
+  const rows = await request(`/rest/v1/mld_lots?lot_id=eq.${encodeURIComponent(lotId)}&select=lot_id,owner_user_id,last_paid_cents,purchase_count,updated_at`);
+  return rows?.[0] || null;
+}
+
+export async function getMldLotMetrics(lotId) {
+  const rows = await request(`/rest/v1/mld_lot_directory?lot_id=eq.${encodeURIComponent(lotId)}&select=*`);
+  return rows?.[0] || null;
+}
+
+export async function createMldOffer({ lotId, buyerUserId, amountCents, expiresHours=168 }) {
+  return request('/rest/v1/rpc/mld_create_offer', { method:'POST', body:{
+    p_lot_id:lotId, p_buyer_user_id:buyerUserId, p_amount_cents:amountCents, p_expires_hours:expiresHours
+  }});
+}
+
+export async function withdrawMldOffer({ offerId, buyerUserId }) {
+  return request('/rest/v1/rpc/mld_withdraw_offer', { method:'POST', body:{
+    p_offer_id:offerId, p_buyer_user_id:buyerUserId
+  }});
+}
+
+export async function acceptMldOffer({ offerId, sellerUserId, paymentWindowHours=24 }) {
+  return request('/rest/v1/rpc/mld_accept_offer', { method:'POST', body:{
+    p_offer_id:offerId, p_seller_user_id:sellerUserId, p_payment_window_hours:paymentWindowHours
+  }});
+}
+
+export async function attachMldOfferCheckout({ offerId, buyerUserId, sessionId }) {
+  return request('/rest/v1/rpc/mld_attach_offer_checkout', { method:'POST', body:{
+    p_offer_id:offerId, p_buyer_user_id:buyerUserId, p_session_id:sessionId
+  }});
+}
+
+export async function processMldResaleCheckoutCompleted({ eventId, offerId, sessionId, paymentIntentId }) {
+  return request('/rest/v1/rpc/process_mld_resale_checkout_completed', { method:'POST', body:{
+    p_event_id:eventId, p_offer_id:offerId, p_session_id:sessionId, p_payment_intent_id:paymentIntentId || null
+  }});
+}
+
+export async function processMldResaleCheckoutExpired({ eventId, offerId, sessionId }) {
+  return request('/rest/v1/rpc/process_mld_resale_checkout_expired', { method:'POST', body:{
+    p_event_id:eventId, p_offer_id:offerId, p_session_id:sessionId
+  }});
+}
+
+export async function getMldOffer(offerId) {
+  const rows = await request(`/rest/v1/mld_offer_directory?id=eq.${encodeURIComponent(offerId)}&select=*`);
+  return rows?.[0] || null;
+}
+
+export async function listSentMldOffers(userId) {
+  return request(`/rest/v1/mld_offer_directory?buyer_user_id=eq.${encodeURIComponent(userId)}&select=*&order=created_at.desc`);
+}
+
+export async function listReceivedMldOffers(userId) {
+  return request(`/rest/v1/mld_offer_directory?seller_user_id=eq.${encodeURIComponent(userId)}&select=*&order=created_at.desc`);
+}
+
+export async function getSellerPayoutReadiness(userId) {
+  const rows = await request(`/rest/v1/seller_payout_readiness?user_id=eq.${encodeURIComponent(userId)}&select=*`);
+  return rows?.[0] || {
+    user_id:userId,
+    owned_lots:0,
+    stripe_account_id:null,
+    onboarding_status:'not_started',
+    transfers_enabled:false,
+    payouts_enabled:false,
+    details_submitted:false,
+    requirements_due_count:0,
+    last_stripe_sync_at:null,
+    resale_payout_ready:false
+  };
+}
