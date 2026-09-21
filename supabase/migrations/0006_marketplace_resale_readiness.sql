@@ -39,6 +39,7 @@ create unique index if not exists idx_mld_one_accepted_checkout_per_lot
   where status='accepted_pending_payment';
 
 alter table public.mld_transactions
+  add column if not exists offer_id uuid references public.mld_offers(id),
   add column if not exists stripe_charge_id text,
   add column if not exists stripe_transfer_id text,
   add column if not exists transfer_group text,
@@ -48,6 +49,10 @@ alter table public.mld_transactions
 create unique index if not exists idx_mld_transactions_transfer
   on public.mld_transactions(stripe_transfer_id)
   where stripe_transfer_id is not null;
+
+create unique index if not exists idx_mld_transactions_offer
+  on public.mld_transactions(offer_id)
+  where offer_id is not null;
 
 create index if not exists idx_seller_payout_status
   on public.seller_payout_profiles(onboarding_status, transfers_enabled, payouts_enabled);
@@ -258,11 +263,11 @@ begin
   v_mld_fee := v_offer.amount_cents - v_seller_payout;
 
   insert into public.mld_transactions(
-    id, lot_id, kind, buyer_user_id, seller_user_id, gross_cents,
+    id, offer_id, lot_id, kind, buyer_user_id, seller_user_id, gross_cents,
     previous_paid_cents, gain_cents, seller_payout_cents, mld_fee_cents,
     stripe_payment_intent_id, payout_status, transfer_group
   ) values(
-    v_tx, v_lot.lot_id, 'resale', v_offer.buyer_user_id, v_lot.owner_user_id, v_offer.amount_cents,
+    v_tx, p_offer_id, v_lot.lot_id, 'resale', v_offer.buyer_user_id, v_lot.owner_user_id, v_offer.amount_cents,
     v_lot.last_paid_cents, v_gain, v_seller_payout, v_mld_fee,
     p_payment_intent_id, 'pending', 'atlas259-resale-' || v_tx::text
   );
@@ -293,6 +298,56 @@ begin
 
   return v_tx;
 end $$;
+
+create or replace function public.process_mld_resale_checkout_completed(
+  p_event_id text,
+  p_offer_id uuid,
+  p_session_id text,
+  p_payment_intent_id text
+) returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $
+declare
+  v_tx uuid;
+begin
+  insert into public.stripe_events(event_id,type)
+  values(p_event_id,'atlas259.resale.checkout.completed')
+  on conflict do nothing;
+
+  if not found then
+    select id into v_tx from public.mld_transactions where offer_id=p_offer_id;
+    return v_tx;
+  end if;
+
+  return public.mld_finalize_paid_offer(p_offer_id,p_session_id,p_payment_intent_id);
+end $;
+
+create or replace function public.process_mld_resale_checkout_expired(
+  p_event_id text,
+  p_offer_id uuid,
+  p_session_id text
+) returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $
+begin
+  insert into public.stripe_events(event_id,type)
+  values(p_event_id,'atlas259.resale.checkout.expired')
+  on conflict do nothing;
+
+  if not found then return true; end if;
+
+  update public.mld_offers
+  set status='expired', resolved_at=now()
+  where id=p_offer_id
+    and stripe_checkout_session_id=p_session_id
+    and status='accepted_pending_payment';
+
+  return true;
+end $;
 
 create or replace function public.mld_mark_transfer_result(
   p_transaction_id uuid,
@@ -371,6 +426,8 @@ revoke execute on function public.mld_accept_offer(uuid,uuid,integer) from publi
 revoke execute on function public.mld_attach_offer_checkout(uuid,uuid,text) from public, anon, authenticated;
 revoke execute on function public.mld_expire_offers() from public, anon, authenticated;
 revoke execute on function public.mld_finalize_paid_offer(uuid,text,text) from public, anon, authenticated;
+revoke execute on function public.process_mld_resale_checkout_completed(text,uuid,text,text) from public, anon, authenticated;
+revoke execute on function public.process_mld_resale_checkout_expired(text,uuid,text) from public, anon, authenticated;
 revoke execute on function public.mld_mark_transfer_result(uuid,text,text,text) from public, anon, authenticated;
 
 grant execute on function public.mld_create_offer(text,uuid,integer,integer) to service_role;
@@ -379,6 +436,8 @@ grant execute on function public.mld_accept_offer(uuid,uuid,integer) to service_
 grant execute on function public.mld_attach_offer_checkout(uuid,uuid,text) to service_role;
 grant execute on function public.mld_expire_offers() to service_role;
 grant execute on function public.mld_finalize_paid_offer(uuid,text,text) to service_role;
+grant execute on function public.process_mld_resale_checkout_completed(text,uuid,text,text) to service_role;
+grant execute on function public.process_mld_resale_checkout_expired(text,uuid,text) to service_role;
 grant execute on function public.mld_mark_transfer_result(uuid,text,text,text) to service_role;
 
 insert into public.audit_logs(actor,action,target_id,metadata)
