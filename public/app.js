@@ -236,6 +236,22 @@ async function showPanel(tab){
   const panel=$('#side-panel');panel.classList.remove('hidden');$$('.tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));
   if(tab==='board'){ $('#panel-kicker').textContent='THE BOARD';$('#panel-title').textContent='Brands on the Moon';const data=await api('/api/board');$('#panel-content').innerHTML=data.board.length?data.board.map((row,i)=>`<div class="board-row" data-claim="${row.id}"><span class="rank">${String(i+1).padStart(2,'0')}</span><div class="row-copy"><strong>${escapeHtml(row.brand)}</strong><small>${escapeHtml(row.tagline||'No tagline yet')}</small></div><div class="row-metrics">${row.views} <small>views · ${row.clicks} clicks</small></div></div>`).join(''):'<div class="panel-empty">No brands are on the board yet.</div>';$$('[data-claim]').forEach(el=>el.onclick=()=>{const c=state.claims.find(x=>x.id===el.dataset.claim);if(c){const pos=displayCoords(c.sectors[0]);if(pos){focusSector(pos.x,pos.y);positionFlagCard(c);}}})}
   if(tab==='explore'){ $('#panel-kicker').textContent='EXPLORE';$('#panel-title').textContent='Landmarks & flags';const data=await api('/api/explore');$('#panel-content').innerHTML=`<div class="panel-section">${data.landmarks.map(l=>`<div class="land-row" data-landmark="${l.id}"><span class="rank">◎</span><div class="row-copy"><strong>${escapeHtml(l.name)}</strong><small>${escapeHtml(l.subtitle)}</small></div><div class="row-metrics">${l.lat.toFixed(1)}°<small>${l.lon.toFixed(1)}°</small></div></div>`).join('')}</div>`;$$('[data-landmark]').forEach(el=>el.onclick=()=>{const l=state.landmarks.find(x=>x.id===el.dataset.landmark);if(l){focusSector(l.lotX??l.x,l.lotY??l.y,3.2);panel.classList.add('hidden');setTabActive('plot')}})}
+  if(tab==='worlds'){
+    $('#panel-kicker').textContent='ATLAS 259';
+    $('#panel-title').textContent='Registry of worlds';
+    try{
+      const data=await api('/api/celestial-bodies');
+      const rows=data.bodies.map(body=>{
+        const live=body.enabled;
+        const mode=body.inventoryMode==='surface-lots'?'surface registry':'observation registry';
+        const lots=body.totalLots?Number(body.totalLots).toLocaleString()+' positions':mode;
+        return `<div class="land-row"><span class="rank">${live?'●':'○'}</span><div class="row-copy"><strong>${escapeHtml(body.name)}${live?' · LIVE':''}</strong><small>Phase ${body.phase} · ${escapeHtml(mode)}</small></div><div class="row-metrics">${escapeHtml(lots)}<small>${live?'open now':'locked'}</small></div></div>`;
+      }).join('');
+      $('#panel-content').innerHTML=`<div class="panel-section">${rows}</div><div class="panel-empty">The Moon stays the first live market. New worlds unlock in phases so Atlas 259 does not dilute attention or scarcity by opening the whole Solar System at once.</div>`;
+    }catch(e){
+      $('#panel-content').innerHTML=`<div class="panel-empty">${escapeHtml(e.message)}</div>`;
+    }
+  }
   if(tab==='land'){ $('#panel-kicker').textContent='MY LAND';$('#panel-title').textContent=state.user?state.user.brand:'Your place on the Moon';if(!state.user){$('#panel-content').innerHTML='<div class="panel-empty">Sign in to see every registry position you hold, plus views and click-throughs.<div class="panel-cta"><button id="panel-signin" class="claim-btn">Sign in</button></div></div>';$('#panel-signin').onclick=openAuth;return}try{const data=await api('/api/my-land');$('#panel-content').innerHTML=data.claims.length?data.claims.map(c=>`<div class="mine-row" data-mine="${c.id}"><span class="rank">⚑</span><div class="row-copy"><strong>${escapeHtml(c.brand)}</strong><small>${c.sectors.length} positions · $${c.amount} claimed</small></div><div class="row-metrics">${c.views||0}<small>views · ${c.clicks||0} clicks</small></div></div>`).join(''):'<div class="panel-empty">You have not registered a position yet. Close this panel, select a position, and place your first marker.</div>';$$('[data-mine]').forEach(el=>el.onclick=()=>{const c=state.claims.find(x=>x.id===el.dataset.mine);if(c){const [,x,y]=c.sectors[0].split('-');focusSector(+x,+y);positionFlagCard(c)}})}catch(e){$('#panel-content').innerHTML=`<div class="panel-empty">${escapeHtml(e.message)}</div>`}}
 }
 function setTabActive(tab){$$('.tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab))}
