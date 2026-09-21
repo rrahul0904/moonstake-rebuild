@@ -1,4 +1,4 @@
-export const SEMANTIC_API_VERSION = '2026-09-21';
+export const SEMANTIC_API_VERSION = '2026-09-21.2';
 
 export function clampSemanticZoom(value, min = 0.72, max = 5.5) {
   const numeric = Number(value);
@@ -6,15 +6,19 @@ export function clampSemanticZoom(value, min = 0.72, max = 5.5) {
   return Math.max(min, Math.min(max, numeric));
 }
 
-export function parseSectorId(id, grid = { cols: 64, rows: 32 }) {
-  const match = /^S-(\d{2})-(\d{2})$/.exec(String(id || '').trim());
-  if (!match) throw new Error('Sector id must look like S-00-00');
-  const x = Number(match[1]);
-  const y = Number(match[2]);
-  if (x < 0 || y < 0 || x >= grid.cols || y >= grid.rows) {
-    throw new Error('Sector is outside the Moonstake grid');
+export function parseSectorId(id, grid = { cols: 720, rows: 360 }) {
+  const value=String(id || '').trim().toUpperCase();
+  const legacy=/^S-(\d{2})-(\d{2})$/.exec(value);
+  if(legacy){
+    const x=Number(legacy[1]),y=Number(legacy[2]);
+    if(x<0||y<0||x>=64||y>=32)throw new Error('Legacy sector is outside the donor grid');
+    return {id:`S-${String(x).padStart(2,'0')}-${String(y).padStart(2,'0')}`,x,y,kind:'legacy-sector'};
   }
-  return { id: `S-${String(x).padStart(2, '0')}-${String(y).padStart(2, '0')}`, x, y };
+  const match=/^MOON-(\d{3})-(\d{3})$/.exec(value);
+  if(!match)throw new Error('Registry position must look like MOON-000-000');
+  const x=Number(match[1]),y=Number(match[2]);
+  if(x<0||y<0||x>=grid.cols||y>=grid.rows)throw new Error('Registry position is outside the Moon board');
+  return {id:`MOON-${String(x).padStart(3,'0')}-${String(y).padStart(3,'0')}`,x,y,kind:'moon-lot'};
 }
 
 export function searchSemanticEntities(query, { landmarks = [], claims = [] } = {}, limit = 10) {
