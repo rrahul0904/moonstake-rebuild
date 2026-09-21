@@ -1,3 +1,4 @@
+import { moonIndexFromGmvCents } from './market-model.mjs';
 import crypto from 'node:crypto';
 import {
   authRefresh,
@@ -167,10 +168,11 @@ export function claimStats(rows) {
     clicks: Number(r.clicks || 0),
     status: r.status,
   }));
+  const gmvCents = claims.reduce((sum, claim) => sum + Math.round(claim.amount * 100), 0);
   return {
     claims,
     offices: claims.length,
-    index: 100,
+    index: moonIndexFromGmvCents(gmvCents),
     onBoard: claims.length,
     views: claims.reduce((s, c) => s + c.views, 0),
     clickThroughs: claims.reduce((s, c) => s + c.clicks, 0),
