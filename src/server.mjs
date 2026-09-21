@@ -5,6 +5,7 @@ import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { readDb, mutateDb } from './store.mjs';
 import { LANDMARKS, quoteSectors } from './pricing.mjs';
+import { MLD_MARKET, moonIndexFromGmvCents } from './market-model.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const publicDir = path.resolve(here, '../public');
@@ -105,9 +106,10 @@ function stats(db) {
     claimEventCounts.set(event.claimId, row);
   }
   const claimedSectors = db.claims.reduce((sum, claim) => sum + claim.sectors.length, 0);
+  const gmvCents = db.claims.reduce((sum, claim) => sum + Math.round(Number(claim.amount || 0) * 100), 0);
   return {
     offices: db.claims.length,
-    index: 100,
+    index: moonIndexFromGmvCents(gmvCents),
     onBoard: db.claims.length,
     views: db.events.filter((e) => e.type === 'view').length,
     clickThroughs: db.events.filter((e) => e.type === 'click').length,
@@ -162,6 +164,10 @@ async function handleApi(req, res, url) {
       landmarks: LANDMARKS,
       paymentsMode: process.env.PAYMENTS_MODE || 'demo'
     }, securityHeaders());
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/market-model') {
+    return json(res, 200, { market: MLD_MARKET }, securityHeaders());
   }
 
   if (req.method === 'GET' && url.pathname === '/api/board') {
