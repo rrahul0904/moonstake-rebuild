@@ -1,6 +1,6 @@
-# Moonstake — clean-room rebuild
+# Atlas 259 — the registry of worlds
 
-A working clean-room recreation of the product model visible at `https://www.moonstake.org/`: an interactive lunar surface where startups can search lunar landmarks, select purchasable sectors, plant a brand flag, appear on a public board, and track views/click-throughs.
+**Atlas 259** is the product brand for this clean-room celestial registry and attention marketplace. The Moon is the first live market; Mars and additional bodies follow the phased Solar System model. Moonstake.org remains the donor/reference product used for clean-room behavioral research.
 
 This repository contains original implementation code. It does **not** copy Moonstake's private source code or proprietary backend. The visible product behavior was studied from the public website and rebuilt independently.
 
@@ -58,7 +58,7 @@ The code is present, but a public launch is **not** called complete until a dedi
 
 ## Semantic lunar control
 
-The web app now exposes a purchase-safe semantic control surface at `window.moonstakeSemantic`. It is designed as the clean-room donor integration from the Limoni globe concept: automation addresses landmarks, claims and sectors by identity rather than screen coordinates. See `docs/LIMONI_GLOBE_DONOR.md`.
+The web app exposes its canonical semantic control surface at `window.atlas259Semantic`. A temporary `window.moonstakeSemantic` alias remains only for backwards compatibility while donor-specific tests migrate. It is designed as the clean-room donor integration from the Limoni globe concept: automation addresses landmarks, claims and sectors by identity rather than screen coordinates. See `docs/LIMONI_GLOBE_DONOR.md`.
 
 
 ## Solar System expansion
@@ -74,3 +74,11 @@ The Moon remains the launch market. The new `src/celestial-market.mjs` layer gen
 - scientific geography should come from NASA/JPL/PDS and USGS/IAU nomenclature sources
 
 See `docs/SOLAR_SYSTEM_EXPANSION.md`.
+
+
+## Brand
+
+Working product name: **Atlas 259**  
+Tagline: **The registry of worlds.**
+
+The repository name remains `moonstake-rebuild` temporarily because it documents the clean-room donor lineage and avoids breaking deployment/review references while the new brand goes through trademark/domain clearance. New user-facing product work should use Atlas 259.
