@@ -24,12 +24,12 @@ export async function createCheckoutSession({ reservationId, amountCents, sector
   form.set('client_reference_id', reservationId);
   form.set('line_items[0][price_data][currency]','usd');
   form.set('line_items[0][price_data][unit_amount]', String(amountCents));
-  form.set('line_items[0][price_data][product_data][name]', `${sectorCount} Moonstake lunar sector${sectorCount === 1 ? '' : 's'}`);
+  form.set('line_items[0][price_data][product_data][name]', `${sectorCount} Atlas 259 Moon registry position${sectorCount === 1 ? '' : 's'}`);
   form.set('line_items[0][price_data][product_data][description]', `Brand placement for ${brand}`);
   form.set('line_items[0][quantity]','1');
   form.set('metadata[reservation_id]', reservationId);
   form.set('metadata[brand]', brand.slice(0, 64));
-  form.set('integration_identifier', `moonstake_checkout_${randomLetters(8)}`);
+  form.set('integration_identifier', `atlas259_checkout_${randomLetters(8)}`);
   form.set('expires_at', String(Math.floor(Date.now()/1000) + 30 * 60));
 
   const res = await fetch(`${STRIPE_API}/checkout/sessions`, {
@@ -37,7 +37,7 @@ export async function createCheckoutSession({ reservationId, amountCents, sector
     headers:{
       authorization:`Bearer ${process.env.STRIPE_SECRET_KEY}`,
       'content-type':'application/x-www-form-urlencoded',
-      'idempotency-key':`moonstake-reservation-${reservationId}`
+      'idempotency-key':`atlas259-reservation-${reservationId}`
     },
     body:form
   });
@@ -61,7 +61,7 @@ export async function createRefund({ claimId, paymentIntentId, reason='requested
     headers:{
       authorization:`Bearer ${process.env.STRIPE_SECRET_KEY}`,
       'content-type':'application/x-www-form-urlencoded',
-      'idempotency-key':`moonstake-refund-${claimId}`
+      'idempotency-key':`atlas259-refund-${claimId}`
     },
     body:form
   });
