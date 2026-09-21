@@ -1,9 +1,9 @@
 {
-  "name": "moonstake-rebuild",
+  "name": "atlas259",
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Clean-room reverse-engineered implementation of the moonstake.org product model.",
+  "description": "Atlas 259: a clean-room celestial registry and attention marketplace, starting with the Moon.",
   "scripts": {
     "dev": "node --watch src/server.mjs",
     "start": "node src/server.mjs",
