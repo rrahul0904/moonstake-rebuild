@@ -77,7 +77,17 @@ export async function listUnavailableSectorIds() {
   return [...new Set([...(claimed || []).map(x => x.sector_id), ...(held || []).map(x => x.sector_id)])];
 }
 
-export async function reserveSectors({ userId, brand, tagline, url, sectors, amountCents, ttlSeconds=2100 }) {
+export async function reserveSectors({ userId, brand, tagline, url, sectors, pricesCents, amountCents, ttlSeconds=2100 }) {
+  const canonical = (sectors || []).every((id) => /^MOON-\d{3}-\d{3}$/.test(String(id)));
+  if (canonical) {
+    if (!Array.isArray(pricesCents) || pricesCents.length !== sectors.length) {
+      throw new Error('Canonical registry reservations require a per-position price ledger');
+    }
+    return request('/rest/v1/rpc/reserve_registry_positions', { method:'POST', body:{
+      p_user_id:userId, p_brand:brand, p_tagline:tagline, p_url:url || null,
+      p_position_ids:sectors, p_price_cents:pricesCents, p_amount_cents:amountCents, p_ttl_seconds:ttlSeconds
+    }});
+  }
   return request('/rest/v1/rpc/reserve_sectors', { method:'POST', body:{
     p_user_id:userId, p_brand:brand, p_tagline:tagline, p_url:url || null,
     p_sector_ids:sectors, p_amount_cents:amountCents, p_ttl_seconds:ttlSeconds
@@ -131,4 +141,10 @@ export async function consumeRateLimit({ bucket, keyHash, limit, windowSeconds }
   return request('/rest/v1/rpc/consume_rate_limit', { method:'POST', body:{
     p_bucket:bucket, p_key_hash:keyHash, p_limit:limit, p_window_seconds:windowSeconds
   }});
+}
+
+
+export async function getMldMarketSummary() {
+  const rows = await request('/rest/v1/mld_market_summary?select=*');
+  return rows?.[0] || null;
 }
