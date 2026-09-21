@@ -11,7 +11,7 @@ const ctx = canvas.getContext('2d');
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => [...document.querySelectorAll(s)];
 
-const GRID = { cols: 64, rows: 32 };
+const GRID = { cols: 720, rows: 360, totalLots: 259200 };
 const state = {
   dpr: Math.min(devicePixelRatio || 1, 2),
   zoom: 1,
@@ -119,7 +119,23 @@ function screenToSector(clientX, clientY) {
   const gx = Math.floor(((x-(m.cx-m.r))/m.size)*GRID.cols);
   const gy = Math.floor(((y-(m.cy-m.r))/m.size)*GRID.rows);
   if (gx<0||gy<0||gx>=GRID.cols||gy>=GRID.rows) return null;
-  return { x:gx, y:gy, id:`S-${String(gx).padStart(2,'0')}-${String(gy).padStart(2,'0')}` };
+  return { x:gx, y:gy, id:`MOON-${String(gx).padStart(3,'0')}-${String(gy).padStart(3,'0')}` };
+}
+
+function displayCoords(id){
+  const value=String(id||'').toUpperCase();
+  let match=/^MOON-(\d{3})-(\d{3})$/.exec(value);
+  if(match)return {x:Number(match[1]),y:Number(match[2]),kind:'moon-lot'};
+  match=/^S-(\d{2})-(\d{2})$/.exec(value);
+  if(match){
+    const legacyX=Number(match[1]),legacyY=Number(match[2]);
+    return {
+      x:Math.min(GRID.cols-1,Math.floor(((legacyX+.5)/64)*GRID.cols)),
+      y:Math.min(GRID.rows-1,Math.floor(((legacyY+.5)/32)*GRID.rows)),
+      kind:'legacy-sector'
+    };
+  }
+  return null;
 }
 
 function sectorClaim(id) { return state.claims.find(c => c.sectors.includes(id)); }
@@ -133,21 +149,25 @@ function draw() {
   if (state.moon) ctx.drawImage(state.moon,m.cx-m.r,m.cy-m.r,m.size,m.size);
 
   ctx.save(); ctx.beginPath();ctx.arc(m.cx,m.cy,m.r,0,Math.PI*2);ctx.clip();
-  if (state.zoom >= 1.22) {
-    ctx.strokeStyle = state.zoom > 2 ? 'rgba(255,255,255,.14)' : 'rgba(255,255,255,.075)';
+  if (state.zoom >= 2.15) {
+    const left=m.cx-m.r,top=m.cy-m.r,cellW=m.size/GRID.cols,cellH=m.size/GRID.rows;
+    const minX=Math.max(0,Math.floor((0-left)/cellW)-1),maxX=Math.min(GRID.cols,Math.ceil((w-left)/cellW)+1);
+    const minY=Math.max(0,Math.floor((0-top)/cellH)-1),maxY=Math.min(GRID.rows,Math.ceil((h-top)/cellH)+1);
+    const step=state.zoom>=4.6?1:state.zoom>=3.2?2:5;
+    ctx.strokeStyle = state.zoom >= 4.6 ? 'rgba(255,255,255,.13)' : 'rgba(255,255,255,.075)';
     ctx.lineWidth=1;
-    for(let x=0;x<=GRID.cols;x++){const px=m.cx-m.r+(x/GRID.cols)*m.size;ctx.beginPath();ctx.moveTo(px,m.cy-m.r);ctx.lineTo(px,m.cy+m.r);ctx.stroke()}
-    for(let y=0;y<=GRID.rows;y++){const py=m.cy-m.r+(y/GRID.rows)*m.size;ctx.beginPath();ctx.moveTo(m.cx-m.r,py);ctx.lineTo(m.cx+m.r,py);ctx.stroke()}
+    for(let x=Math.ceil(minX/step)*step;x<=maxX;x+=step){const px=left+x*cellW;ctx.beginPath();ctx.moveTo(px,m.cy-m.r);ctx.lineTo(px,m.cy+m.r);ctx.stroke()}
+    for(let y=Math.ceil(minY/step)*step;y<=maxY;y+=step){const py=top+y*cellH;ctx.beginPath();ctx.moveTo(m.cx-m.r,py);ctx.lineTo(m.cx+m.r,py);ctx.stroke()}
   }
   for (const claim of state.claims) {
     for (const id of claim.sectors) {
-      const [,sx,sy]=id.split('-');const r=sectorRect(+sx,+sy);
+      const pos=displayCoords(id);if(!pos)continue;const r=sectorRect(pos.x,pos.y);
       ctx.fillStyle='rgba(7,7,7,.44)';ctx.fillRect(r.x+.5,r.y+.5,Math.max(1,r.w-1),Math.max(1,r.h-1));
       ctx.strokeStyle='rgba(255,255,255,.72)';ctx.lineWidth=Math.max(1,Math.min(2,state.zoom*.8));ctx.strokeRect(r.x+1,r.y+1,Math.max(0,r.w-2),Math.max(0,r.h-2));
     }
   }
   for (const id of state.selected) {
-    const [,sx,sy]=id.split('-');const r=sectorRect(+sx,+sy);
+    const pos=displayCoords(id);if(!pos)continue;const r=sectorRect(pos.x,pos.y);
     ctx.fillStyle='rgba(216,255,132,.32)';ctx.fillRect(r.x,r.y,r.w,r.h);ctx.strokeStyle='#d7ff86';ctx.lineWidth=2;ctx.strokeRect(r.x+1,r.y+1,Math.max(0,r.w-2),Math.max(0,r.h-2));
   }
   if(state.hoveredSector && state.zoom>=1.15){const r=sectorRect(state.hoveredSector.x,state.hoveredSector.y);ctx.strokeStyle='rgba(255,255,255,.9)';ctx.lineWidth=1;ctx.strokeRect(r.x+.5,r.y+.5,r.w-1,r.h-1)}
@@ -155,7 +175,7 @@ function draw() {
 
   if (state.zoom >= 1.05) {
     for (const landmark of state.landmarks) {
-      const r=sectorRect(landmark.x,landmark.y);const x=r.x+r.w/2,y=r.y+r.h/2;
+      const r=sectorRect(landmark.lotX??landmark.x,landmark.lotY??landmark.y);const x=r.x+r.w/2,y=r.y+r.h/2;
       if(Math.hypot(x-m.cx,y-m.cy)>m.r) continue;
       ctx.fillStyle='#f2efe6';ctx.beginPath();ctx.arc(x,y,2.4,0,Math.PI*2);ctx.fill();
       if(state.zoom>1.55){ctx.font='9px ui-monospace,monospace';ctx.fillStyle='rgba(255,255,255,.72)';ctx.fillText(landmark.name,x+7,y+3)}
@@ -174,7 +194,7 @@ function zoomAt(delta, clientX=canvas.clientWidth/2, clientY=canvas.clientHeight
   state.zoom=next;const nm=moonGeometry();state.panX += (px-(nm.cx+wx*next));state.panY += (py-(nm.cy+wy*next));clampPan();draw();
 }
 
-function setMode(mode){state.mode=mode;$('#mode-move').classList.toggle('active',mode==='move');$('#mode-select').classList.toggle('active',mode==='select');canvas.classList.toggle('selecting',mode==='select');$('#map-hint-text').textContent=mode==='select'?'Click sectors to add or remove them':'Drag to move · click a place to zoom in · scroll to zoom'}
+function setMode(mode){state.mode=mode;$('#mode-move').classList.toggle('active',mode==='move');$('#mode-select').classList.toggle('active',mode==='select');canvas.classList.toggle('selecting',mode==='select');$('#map-hint-text').textContent=mode==='select'?'Click registry positions to add or remove them':'Drag to move · click a place to zoom in · scroll to zoom'}
 
 function updateStats(){if(!state.stats)return;const items=[['Offices',state.stats.offices],['Index',state.stats.index],['On the board',state.stats.onBoard],['Views',state.stats.views],['Click-throughs',state.stats.clickThroughs]];$('#desktop-stats').innerHTML=items.map(([label,value])=>`<div class="stat"><span>${Number(value).toLocaleString()}</span><small>${label}</small></div>`).join('')}
 
@@ -182,7 +202,7 @@ async function updateQuote(){
   if(!state.selected.size){state.quote={count:0,total:0,unavailable:[]};renderSelection();return}
   try{state.quote=await api('/api/quote',{method:'POST',body:JSON.stringify({sectors:[...state.selected]})});if(state.quote.unavailable?.length){for(const id of state.quote.unavailable)state.selected.delete(id);draw()}}catch(e){toast(e.message)}renderSelection();
 }
-function renderSelection(){const q=state.quote;$('#sector-count').textContent=`${state.selected.size} sector${state.selected.size===1?'':'s'}`;$('#selection-price').textContent=state.selected.size?`$${q.total||0}`:'—';$('#claim-btn').textContent=`Claim for $${q.total||0}`;$('#claim-btn').disabled=!state.selected.size||!!q.unavailable?.length}
+function renderSelection(){const q=state.quote;$('#sector-count').textContent=`${state.selected.size} position${state.selected.size===1?'':'s'}`;$('#selection-price').textContent=state.selected.size?`${q.total||0}`:'—';$('#claim-btn').textContent=`Register for ${q.total||0}`;$('#claim-btn').disabled=!state.selected.size||!!q.unavailable?.length}
 
 async function bootstrap(){
   const data=await api('/api/bootstrap');Object.assign(state,{claims:data.claims,landmarks:data.landmarks,user:data.user,stats:data.stats});renderAuthState();updateStats();draw();setTimeout(()=>$('#boot').classList.add('done'),450)
@@ -195,12 +215,12 @@ function toast(message){const t=$('#toast');t.textContent=message;t.classList.re
 
 function setAuthMode(mode){state.authMode=mode;const signup=mode==='signup';$('#auth-signin-tab').classList.toggle('active',!signup);$('#auth-signup-tab').classList.toggle('active',signup);$('#brand-field').classList.toggle('hidden',!signup);$('#auth-title').textContent=signup?'Create your Atlas 259 account':'Sign in to register a position';$('#auth-password').autocomplete=signup?'new-password':'current-password'}
 function openAuth(){setAuthMode('signin');showModal('#auth-modal')}
-function openClaim(){if(!state.selected.size)return;if(!state.user){state.pendingClaimAfterAuth=true;openAuth();return}$('#claim-brand').value=state.user.brand||'';$('#claim-tagline').value='';$('#claim-url').value='';$('#claim-summary').textContent=`${state.selected.size} sector${state.selected.size===1?'':'s'} · demo checkout`;$('#claim-total').textContent=`$${state.quote.total}`;showModal('#claim-modal')}
+function openClaim(){if(!state.selected.size)return;if(!state.user){state.pendingClaimAfterAuth=true;openAuth();return}$('#claim-brand').value=state.user.brand||'';$('#claim-tagline').value='';$('#claim-url').value='';$('#claim-summary').textContent=`${state.selected.size} registry position${state.selected.size===1?'':'s'} · demo checkout`;$('#claim-total').textContent=`$${state.quote.total}`;showModal('#claim-modal')}
 
 async function refresh(){const data=await api('/api/bootstrap');state.claims=data.claims;state.stats=data.stats;state.user=data.user;updateStats();renderAuthState();draw()}
 
 function positionFlagCard(claim,id){
-  state.activeClaim=claim;const first=id||claim.sectors[0];const [,sx,sy]=first.split('-');const r=sectorRect(+sx,+sy);const card=$('#flag-card');
+  state.activeClaim=claim;const first=id||claim.sectors[0];const pos=displayCoords(first);if(!pos)return;const r=sectorRect(pos.x,pos.y);const card=$('#flag-card');
   card.innerHTML=`<button class="flag-close" aria-label="Close">×</button><h3>${escapeHtml(claim.brand)}</h3><p>${escapeHtml(claim.tagline||'A registry marker on the Moon.')}</p><div class="flag-meta"><span>${claim.sectors.length} sector${claim.sectors.length===1?'':'s'}</span><span>${claim.views||0} views · ${claim.clicks||0} clicks</span></div>${claim.url?`<a href="${escapeAttr(claim.url)}" target="_blank" rel="noopener noreferrer">Visit ${escapeHtml(claim.brand)} ↗</a>`:''}`;
   const left=Math.min(canvas.clientWidth-285,Math.max(12,r.x+14));const top=Math.min(canvas.clientHeight-250,Math.max(92,r.y-36));card.style.left=`${left}px`;card.style.top=`${top}px`;card.classList.remove('hidden');card.querySelector('.flag-close').onclick=()=>card.classList.add('hidden');const link=card.querySelector('a');if(link)link.addEventListener('click',()=>api('/api/events/click',{method:'POST',body:JSON.stringify({claimId:claim.id})}).catch(()=>{}));api('/api/events/view',{method:'POST',body:JSON.stringify({claimId:claim.id})}).then(refresh).catch(()=>{});
 }
@@ -214,7 +234,7 @@ function focusSector(x,y,targetZoom=2.6){
 
 async function showPanel(tab){
   const panel=$('#side-panel');panel.classList.remove('hidden');$$('.tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));
-  if(tab==='board'){ $('#panel-kicker').textContent='THE BOARD';$('#panel-title').textContent='Brands on the Moon';const data=await api('/api/board');$('#panel-content').innerHTML=data.board.length?data.board.map((row,i)=>`<div class="board-row" data-claim="${row.id}"><span class="rank">${String(i+1).padStart(2,'0')}</span><div class="row-copy"><strong>${escapeHtml(row.brand)}</strong><small>${escapeHtml(row.tagline||'No tagline yet')}</small></div><div class="row-metrics">${row.views} <small>views · ${row.clicks} clicks</small></div></div>`).join(''):'<div class="panel-empty">No brands are on the board yet.</div>';$$('[data-claim]').forEach(el=>el.onclick=()=>{const c=state.claims.find(x=>x.id===el.dataset.claim);if(c){const [,x,y]=c.sectors[0].split('-');focusSector(+x,+y);positionFlagCard(c);}})}
+  if(tab==='board'){ $('#panel-kicker').textContent='THE BOARD';$('#panel-title').textContent='Brands on the Moon';const data=await api('/api/board');$('#panel-content').innerHTML=data.board.length?data.board.map((row,i)=>`<div class="board-row" data-claim="${row.id}"><span class="rank">${String(i+1).padStart(2,'0')}</span><div class="row-copy"><strong>${escapeHtml(row.brand)}</strong><small>${escapeHtml(row.tagline||'No tagline yet')}</small></div><div class="row-metrics">${row.views} <small>views · ${row.clicks} clicks</small></div></div>`).join(''):'<div class="panel-empty">No brands are on the board yet.</div>';$$('[data-claim]').forEach(el=>el.onclick=()=>{const c=state.claims.find(x=>x.id===el.dataset.claim);if(c){const pos=displayCoords(c.sectors[0]);if(pos){focusSector(pos.x,pos.y);positionFlagCard(c);}}})}
   if(tab==='explore'){ $('#panel-kicker').textContent='EXPLORE';$('#panel-title').textContent='Landmarks & flags';const data=await api('/api/explore');$('#panel-content').innerHTML=`<div class="panel-section">${data.landmarks.map(l=>`<div class="land-row" data-landmark="${l.id}"><span class="rank">◎</span><div class="row-copy"><strong>${escapeHtml(l.name)}</strong><small>${escapeHtml(l.subtitle)}</small></div><div class="row-metrics">${l.lat.toFixed(1)}°<small>${l.lon.toFixed(1)}°</small></div></div>`).join('')}</div>`;$$('[data-landmark]').forEach(el=>el.onclick=()=>{const l=state.landmarks.find(x=>x.id===el.dataset.landmark);if(l){focusSector(l.x,l.y,3.2);panel.classList.add('hidden');setTabActive('plot')}})}
   if(tab==='land'){ $('#panel-kicker').textContent='MY LAND';$('#panel-title').textContent=state.user?state.user.brand:'Your place on the Moon';if(!state.user){$('#panel-content').innerHTML='<div class="panel-empty">Sign in to see every sector you own, plus views and click-throughs.<div class="panel-cta"><button id="panel-signin" class="claim-btn">Sign in</button></div></div>';$('#panel-signin').onclick=openAuth;return}try{const data=await api('/api/my-land');$('#panel-content').innerHTML=data.claims.length?data.claims.map(c=>`<div class="mine-row" data-mine="${c.id}"><span class="rank">⚑</span><div class="row-copy"><strong>${escapeHtml(c.brand)}</strong><small>${c.sectors.length} sectors · $${c.amount} claimed</small></div><div class="row-metrics">${c.views||0}<small>views · ${c.clicks||0} clicks</small></div></div>`).join(''):'<div class="panel-empty">You have not claimed land yet. Close this panel, select some sectors, and plant your first flag.</div>';$$('[data-mine]').forEach(el=>el.onclick=()=>{const c=state.claims.find(x=>x.id===el.dataset.mine);if(c){const [,x,y]=c.sectors[0].split('-');focusSector(+x,+y);positionFlagCard(c)}})}catch(e){$('#panel-content').innerHTML=`<div class="panel-empty">${escapeHtml(e.message)}</div>`}}
 }
@@ -232,7 +252,7 @@ $('#auth-form').addEventListener('submit',async e=>{e.preventDefault();const err
 
 $('#claim-form').addEventListener('submit',async e=>{e.preventDefault();const error=$('#claim-error');error.classList.add('hidden');try{const data=await api('/api/claims',{method:'POST',body:JSON.stringify({brand:$('#claim-brand').value,tagline:$('#claim-tagline').value,url:$('#claim-url').value,sectors:[...state.selected]})});closeModals();state.selected.clear();state.quote={count:0,total:0,unavailable:[]};renderSelection();await refresh();const claim=state.claims.find(c=>c.id===data.claim.id)||data.claim;positionFlagCard(claim);toast('Registry position added on the Moon')}catch(err){error.textContent=err.message;error.classList.remove('hidden')}});
 
-const search=$('#search');search.addEventListener('input',()=>{const q=search.value.trim().toLowerCase();const box=$('#search-results');if(!q){box.classList.add('hidden');return}const landmarks=state.landmarks.filter(l=>`${l.name} ${l.subtitle}`.toLowerCase().includes(q)).slice(0,5);const brands=state.claims.filter(c=>`${c.brand} ${c.tagline}`.toLowerCase().includes(q)).slice(0,5);const rows=[...landmarks.map(l=>({kind:'landmark',id:l.id,title:l.name,sub:l.subtitle})),...brands.map(c=>({kind:'claim',id:c.id,title:c.brand,sub:c.tagline||'Brand flag'}))];box.innerHTML=rows.length?rows.map(r=>`<button class="search-result" data-kind="${r.kind}" data-id="${r.id}"><span>${escapeHtml(r.title)}</span><small>${escapeHtml(r.sub)}</small></button>`).join(''):'<button class="search-result" disabled><span>No results</span><small>Try Tycho or Apollo 11</small></button>';box.classList.remove('hidden');$$('.search-result[data-id]').forEach(btn=>btn.onclick=()=>{box.classList.add('hidden');search.value=btn.querySelector('span').textContent;if(btn.dataset.kind==='landmark'){const l=state.landmarks.find(x=>x.id===btn.dataset.id);focusSector(l.x,l.y,3.3)}else{const c=state.claims.find(x=>x.id===btn.dataset.id);const [,x,y]=c.sectors[0].split('-');focusSector(+x,+y,3);positionFlagCard(c)}})});document.addEventListener('click',e=>{if(!e.target.closest('.search-wrap'))$('#search-results').classList.add('hidden')});
+const search=$('#search');search.addEventListener('input',()=>{const q=search.value.trim().toLowerCase();const box=$('#search-results');if(!q){box.classList.add('hidden');return}const landmarks=state.landmarks.filter(l=>`${l.name} ${l.subtitle}`.toLowerCase().includes(q)).slice(0,5);const brands=state.claims.filter(c=>`${c.brand} ${c.tagline}`.toLowerCase().includes(q)).slice(0,5);const rows=[...landmarks.map(l=>({kind:'landmark',id:l.id,title:l.name,sub:l.subtitle})),...brands.map(c=>({kind:'claim',id:c.id,title:c.brand,sub:c.tagline||'Brand flag'}))];box.innerHTML=rows.length?rows.map(r=>`<button class="search-result" data-kind="${r.kind}" data-id="${r.id}"><span>${escapeHtml(r.title)}</span><small>${escapeHtml(r.sub)}</small></button>`).join(''):'<button class="search-result" disabled><span>No results</span><small>Try Tycho or Apollo 11</small></button>';box.classList.remove('hidden');$$('.search-result[data-id]').forEach(btn=>btn.onclick=()=>{box.classList.add('hidden');search.value=btn.querySelector('span').textContent;if(btn.dataset.kind==='landmark'){const l=state.landmarks.find(x=>x.id===btn.dataset.id);focusSector(l.lotX??l.x,l.lotY??l.y,3.3)}else{const c=state.claims.find(x=>x.id===btn.dataset.id);const pos=displayCoords(c.sectors[0]);if(pos){focusSector(pos.x,pos.y,3);positionFlagCard(c)}}})});document.addEventListener('click',e=>{if(!e.target.closest('.search-wrap'))$('#search-results').classList.add('hidden')});
 
 function semanticSnapshot(){
   return buildSemanticSnapshot({
@@ -255,7 +275,7 @@ function semanticSearch(query){
 function semanticFocus(target){
   const value=String(target||'').trim();
   if(!value)throw new Error('Provide a landmark, brand, claim id, or sector id');
-  if(/^S-\d{2}-\d{2}$/.test(value)){
+  if(/^(?:MOON-\d{3}-\d{3}|S-\d{2}-\d{2})$/i.test(value)){
     const sector=parseSectorId(value,GRID);
     focusSector(sector.x,sector.y,Math.max(state.zoom,2.6));
     return semanticSnapshot();
@@ -268,12 +288,12 @@ function semanticFocus(target){
   if(!match)throw new Error(`No Moonstake result found for "${value}"`);
   if(match.kind==='landmark'){
     const landmark=state.landmarks.find(item=>item.id===match.id);
-    focusSector(landmark.x,landmark.y,3.3);
+    focusSector(landmark.lotX??landmark.x,landmark.lotY??landmark.y,3.3);
   }else{
     const claim=state.claims.find(item=>item.id===match.id);
     if(!claim)throw new Error('Claim is no longer available');
-    const [,x,y]=claim.sectors[0].split('-');
-    focusSector(+x,+y,3);
+    const pos=displayCoords(claim.sectors[0]);if(!pos)throw new Error('Claim position is invalid');
+    focusSector(pos.x,pos.y,3);
     positionFlagCard(claim);
   }
   return semanticSnapshot();
