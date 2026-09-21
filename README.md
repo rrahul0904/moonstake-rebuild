@@ -33,7 +33,9 @@ The paid ownership state machine is reservation → Stripe Checkout → signed w
 
 - Full-screen lunar map and responsive desktop/mobile UI
 - Mouse/touch pan, wheel zoom, Whole Moon reset
-- Move / Select modes and 64 × 32 claimable sector grid
+- Move / Select modes and legacy 64 × 32 UI sector grid
+- canonical MLD economics model with 720 × 360 = 259,200 Moon lots
+- generalized Solar System market model for solid-body surface lots versus gas-giant/star observation inventory
 - Server-authoritative pricing and premium sectors
 - Landmark and brand search
 - Semantic browser/agent control contract for search, focus, zoom, sector selection and structured state read-back (purchase actions intentionally excluded)
@@ -57,3 +59,18 @@ The code is present, but a public launch is **not** called complete until a dedi
 ## Semantic lunar control
 
 The web app now exposes a purchase-safe semantic control surface at `window.moonstakeSemantic`. It is designed as the clean-room donor integration from the Limoni globe concept: automation addresses landmarks, claims and sectors by identity rather than screen coordinates. See `docs/LIMONI_GLOBE_DONOR.md`.
+
+
+## Solar System expansion
+
+The Moon remains the launch market. The new `src/celestial-market.mjs` layer generalizes the economic model without pretending every celestial object has sellable ground.
+
+- solid bodies can use globally unique 720 × 360 angular lot IDs such as `MARS-360-180`
+- Moon pricing and MLD resale behavior remain backward compatible
+- Mars, Mercury, Venus, Ceres, Pluto, Europa and Titan are modeled as future surface markets
+- Jupiter, Saturn and the Sun are explicitly non-land inventory and use a separate observation-zone model
+- the launch plan is phased so adding inventory does not immediately fragment Moon liquidity
+- every body has its own index; a Solar Index can aggregate launched markets
+- scientific geography should come from NASA/JPL/PDS and USGS/IAU nomenclature sources
+
+See `docs/SOLAR_SYSTEM_EXPANSION.md`.
