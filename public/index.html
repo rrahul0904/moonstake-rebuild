@@ -45,7 +45,7 @@
         <button id="whole-moon">Whole Moon</button>
       </div>
 
-      <button id="buy-lots" class="buy-pill">Lots from $1 <span>·</span> Buy</button>
+      <button id="buy-lots" class="buy-pill">259,200 lots <span>·</span> From $1</button>
 
       <div class="map-hint glass"><span id="map-hint-text">Click a place to zoom in · scroll to zoom</span><small>Surface: procedural LRO-inspired · NASA/LRO reference</small></div>
       <div id="selection-bar" class="selection-bar glass">
@@ -75,13 +75,13 @@
   <section id="how-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="how-title">
     <button class="modal-close" data-close-modal>×</button>
     <small class="eyebrow">HOW IT WORKS</small>
-    <h2 id="how-title">A tiny piece of the Moon for what you’re building.</h2>
+    <h2 id="how-title">259,200 billboard lots on a real lunar map.</h2>
     <div class="steps">
-      <article><b>01</b><h3>Find a place</h3><p>Search a landmark or navigate the lunar surface. Zoom until sector boundaries appear.</p></article>
-      <article><b>02</b><h3>Select your lots</h3><p>Switch to Select, click one or more available sectors, and see the price update instantly.</p></article>
-      <article><b>03</b><h3>Plant your flag</h3><p>Sign in, add your brand and link, then claim. Your flag appears on the map and the board.</p></article>
+      <article><b>01</b><h3>Find a place</h3><p>Search a real lunar landmark or navigate the surface. Named ground carries a higher billboard price.</p></article>
+      <article><b>02</b><h3>Select your lots</h3><p>Standard lots start at $1. Every lot keeps its last-paid price, views and outbound clicks.</p></article>
+      <article><b>03</b><h3>Plant your flag</h3><p>First sales are MLD revenue. Resale offers must beat last paid by at least $1; +10% is the suggested next offer.</p></article>
     </div>
-    <p class="fineprint">This clean-room rebuild uses a demo checkout so no money is charged. Production payments can be connected through the documented payment adapter.</p>
+    <p class="fineprint">Advertising placement only — a billboard, not a legal claim to lunar land. On a resale, the seller gets the stake back plus 60% of the gain; MLD receives the remainder. Production money movement still requires certified Stripe settlement.</p>
   </section>
 
   <section id="auth-modal" class="modal compact hidden" role="dialog" aria-modal="true" aria-labelledby="auth-title">
@@ -107,7 +107,7 @@
       <label>Tagline<input id="claim-tagline" maxlength="140" placeholder="What are you shipping?" /></label>
       <label>Website<input id="claim-url" inputmode="url" placeholder="https://example.com" /></label>
       <div class="checkout-summary"><span id="claim-summary"></span><strong id="claim-total"></strong></div>
-      <p class="fineprint">Demo checkout: this confirms the purchase flow without charging a card.</p>
+      <p class="fineprint">Advertising placement only — not a legal claim to lunar land. Demo checkout confirms the flow without charging a card.</p>
       <p id="claim-error" class="form-error hidden"></p>
       <button class="primary-wide" type="submit">Confirm claim</button>
     </form>
