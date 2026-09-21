@@ -62,6 +62,7 @@
       <button data-tab="board" class="tab"><span>≡</span>Board</button>
       <button data-tab="explore" class="tab"><span>◎</span>Explore</button>
       <button data-tab="worlds" class="tab"><span>◉</span>Worlds</button>
+      <button data-tab="offers" class="tab"><span>◇</span>Offers</button>
       <button data-tab="land" class="tab"><span>⚑</span>My registry</button>
     </nav>
 
@@ -111,6 +112,20 @@
       <p class="fineprint">Digital registry placement only — not legal celestial real estate or resource rights. Demo checkout confirms the flow without charging a card.</p>
       <p id="claim-error" class="form-error hidden"></p>
       <button class="primary-wide" type="submit">Confirm registry position</button>
+    </form>
+  </section>
+
+  <section id="offer-modal" class="modal compact hidden" role="dialog" aria-modal="true" aria-labelledby="offer-title">
+    <button class="modal-close" data-close-modal>×</button>
+    <small class="eyebrow">SECONDARY MARKET</small>
+    <h2 id="offer-title">Make an offer</h2>
+    <p id="offer-market-summary" class="fineprint"></p>
+    <form id="offer-form">
+      <input id="offer-lot-id" type="hidden" />
+      <label>Offer amount (USD)<input id="offer-amount" type="number" min="2" step="0.01" required /></label>
+      <p class="fineprint">An offer must beat the last-paid amount by at least $1. Atlas 259 also shows a suggested +10% offer where that is higher. Placing an offer does not charge your card.</p>
+      <p id="offer-error" class="form-error hidden"></p>
+      <button class="primary-wide" type="submit">Place offer</button>
     </form>
   </section>
 
