@@ -9,6 +9,7 @@ import {
   getSellerPayoutReadiness,
   listReceivedMldOffers,
   listSentMldOffers,
+  listMldLotTransactions,
   withdrawMldOffer,
 } from './supabase.mjs';
 import { createResaleCheckoutSession } from './stripe.mjs';
@@ -29,7 +30,7 @@ export async function handleMarketplaceApi(req,res,url) {
   if(req.method==='GET'&&marketMatch){
     const lotId=validLotId(decodeURIComponent(marketMatch[1]));
     if(!lotId)return json(res,400,{error:'Invalid Moon registry position'});
-    const [lot,metrics]=await Promise.all([getMldLot(lotId),getMldLotMetrics(lotId)]);
+    const [lot,metrics,history]=await Promise.all([getMldLot(lotId),getMldLotMetrics(lotId),listMldLotTransactions(lotId)]);
     if(!lot)return json(res,404,{error:'This position has not had a primary sale yet'});
     const guidance=offerGuidance(Number(lot.last_paid_cents));
     return json(res,200,{
@@ -44,7 +45,8 @@ export async function handleMarketplaceApi(req,res,url) {
       offer:{
         minimumCents:guidance.minimumCents,
         suggestedCents:guidance.suggestedCents,
-      }
+      },
+      history
     });
   }
 
