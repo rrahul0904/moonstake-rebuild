@@ -86,3 +86,41 @@ export function verifyStripeSignature(rawBody, signatureHeader, secret=process.e
     } catch { return false; }
   });
 }
+
+
+export async function createResaleCheckoutSession({ offerId, amountCents, lotId }) {
+  assertStripeConfig();
+  if (!offerId || !lotId || !Number.isInteger(Number(amountCents)) || Number(amountCents) < 200) {
+    throw new Error('Resale checkout requires offer, lot and valid amount');
+  }
+  const base = String(process.env.APP_URL).replace(/\/$/, '');
+  const form = new URLSearchParams();
+  form.set('mode','payment');
+  form.set('success_url', `${base}/?resale=success&offer_id=${encodeURIComponent(offerId)}&session_id={CHECKOUT_SESSION_ID}`);
+  form.set('cancel_url', `${base}/?resale=cancelled&offer_id=${encodeURIComponent(offerId)}`);
+  form.set('client_reference_id', offerId);
+  form.set('line_items[0][price_data][currency]','usd');
+  form.set('line_items[0][price_data][unit_amount]', String(amountCents));
+  form.set('line_items[0][price_data][product_data][name]', `Atlas 259 resale · ${lotId}`);
+  form.set('line_items[0][price_data][product_data][description]', 'Accepted offer for a digital Moon registry/advertising position; not legal lunar real estate.');
+  form.set('line_items[0][quantity]','1');
+  form.set('metadata[transaction_type]','resale');
+  form.set('metadata[offer_id]', offerId);
+  form.set('metadata[lot_id]', lotId);
+  form.set('integration_identifier', `atlas259_resale_${randomLetters(8)}`);
+  form.set('expires_at', String(Math.floor(Date.now()/1000) + 30 * 60));
+
+  const res = await fetch(`${STRIPE_API}/checkout/sessions`, {
+    method:'POST',
+    headers:{
+      authorization:`Bearer ${process.env.STRIPE_SECRET_KEY}`,
+      'content-type':'application/x-www-form-urlencoded',
+      'idempotency-key':`atlas259-resale-offer-${offerId}`
+    },
+    body:form
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data?.error?.message || `Stripe resale checkout creation failed (${res.status})`);
+  if (!data?.id || !data?.url) throw new Error('Stripe resale checkout response did not include id/url');
+  return data;
+}
