@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import { LANDMARKS, quoteSectors } from './pricing.mjs';
 import { launchPlan } from './celestial-market.mjs';
-import { getMldMarketSummary, insertEvent, listClaims, listUnavailableSectorIds } from './supabase.mjs';
+import { getMldMarketSummary, insertEvent, listClaims, listUnavailableSectorIds, recordMldLotEvent } from './supabase.mjs';
 import { boardFromClaims, claimStats, clientIp, json, readBody, sessionUser } from './production-common.mjs';
 
 export async function handlePublicApi(req, res, url) {
@@ -75,16 +75,22 @@ export async function handlePublicApi(req, res, url) {
   if (req.method === 'POST' && (url.pathname === '/api/events/view' || url.pathname === '/api/events/click')) {
     const body = await readBody(req);
     const claimId = String(body.claimId || '');
+    const lotId = String(body.lotId || '').toUpperCase();
     const claims = claimStats(await listClaims()).claims;
-    if (!claims.some((c) => c.id === claimId)) return json(res, 404, { error: 'Claim not found' });
+    const claim = claims.find((c) => c.id === claimId);
+    if (!claim) return json(res, 404, { error: 'Claim not found' });
+    if (lotId && !claim.sectors.includes(lotId)) return json(res, 400, { error: 'Registry position does not belong to claim' });
     const kind = url.pathname.endsWith('/click') ? 'click' : 'view';
     const fingerprint = crypto
       .createHash('sha256')
       .update(`${clientIp(req)}|${req.headers['user-agent'] || ''}`)
       .digest('hex')
       .slice(0, 32);
-    await insertEvent({ claimId, kind, fingerprint });
-    return json(res, 201, { ok: true });
+    await Promise.all([
+      insertEvent({ claimId, kind, fingerprint }),
+      /^MOON-\d{3}-\d{3}$/.test(lotId) ? recordMldLotEvent({ lotId, kind }) : Promise.resolve(false),
+    ]);
+    return json(res, 201, { ok: true, lotTracked: /^MOON-\d{3}-\d{3}$/.test(lotId) });
   }
 
   return false;
