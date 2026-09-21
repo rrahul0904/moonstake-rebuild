@@ -40,6 +40,7 @@ export async function handleMarketplaceApi(req,res,url) {
         purchaseCount:Number(lot.purchase_count),
         views:Number(metrics?.views||0),
         clicks:Number(metrics?.clicks||0),
+        ctr:Number(metrics?.views||0)>0?Number(metrics?.clicks||0)/Number(metrics?.views||0):0,
         updatedAt:lot.updated_at,
       },
       offer:{
