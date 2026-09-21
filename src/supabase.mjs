@@ -254,3 +254,9 @@ export async function listMldLotTransactions(lotId, limit=25) {
   const safe=Math.max(1,Math.min(100,Number(limit)||25));
   return request(`/rest/v1/mld_transactions?lot_id=eq.${encodeURIComponent(lotId)}&select=id,kind,gross_cents,previous_paid_cents,gain_cents,seller_payout_cents,mld_fee_cents,created_at&order=created_at.desc&limit=${safe}`);
 }
+
+
+export async function listMoonIndexHistory(limit=120) {
+  const safe=Math.max(1,Math.min(1000,Number(limit)||120));
+  return request(`/rest/v1/market_index_snapshots?body_id=eq.moon&select=index_value,gross_market_volume_cents,owned_lots,created_at&order=created_at.asc,id.asc&limit=${safe}`);
+}
