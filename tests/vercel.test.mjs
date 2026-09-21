@@ -8,5 +8,5 @@ test('Vercel catch-all adapter maps rewritten path to production health endpoint
   let status,body;
   const req={method:'GET',url:'/api/index?__path=health',query:{__path:'health'},headers:{host:'moonstake.example','x-forwarded-proto':'https'}};
   const res={headersSent:false,writableEnded:false,writeHead(code){status=code;this.headersSent=true},end(value){body=value;this.writableEnded=true},setHeader(){}};
-  try{await handler(req,res);assert.equal(status,200);const parsed=JSON.parse(body);assert.equal(parsed.ok,true);assert.equal(parsed.service,'moonstake')}finally{process.env=old}
+  try{await handler(req,res);assert.equal(status,200);const parsed=JSON.parse(body);assert.equal(parsed.ok,true);assert.equal(parsed.service,'atlas259')}finally{process.env=old}
 });
