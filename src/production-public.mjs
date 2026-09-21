@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import { LANDMARKS, quoteSectors } from './pricing.mjs';
 import { launchPlan } from './celestial-market.mjs';
-import { getMldMarketSummary, insertEvent, listClaims, listMoonIndexHistory, listUnavailableSectorIds, recordMldLotEvent } from './supabase.mjs';
+import { getMldMarketSummary, insertEvent, listClaims, listMoonIndexHistory, listRecentMldActivity, listUnavailableSectorIds, recordMldLotEvent } from './supabase.mjs';
 import { boardFromClaims, claimStats, clientIp, json, readBody, sessionUser } from './production-common.mjs';
 
 export async function handlePublicApi(req, res, url) {
@@ -39,6 +39,11 @@ export async function handlePublicApi(req, res, url) {
       landmarks: LANDMARKS,
       paymentsMode: 'stripe',
     });
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/activity') {
+    const limit=Math.max(1,Math.min(100,Number(url.searchParams.get('limit'))||30));
+    return json(res,200,{activity:await listRecentMldActivity(limit)});
   }
 
   if (req.method === 'GET' && url.pathname === '/api/index-history') {
