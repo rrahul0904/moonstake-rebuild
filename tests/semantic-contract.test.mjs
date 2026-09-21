@@ -9,12 +9,13 @@ import {
 } from '../public/semantic-contract.js';
 
 test('semantic contract exposes a dated version', () => {
-  assert.equal(SEMANTIC_API_VERSION, '2026-09-21');
+  assert.equal(SEMANTIC_API_VERSION, '2026-09-21.2');
 });
 
-test('sector ids are parsed and bounded', () => {
-  assert.deepEqual(parseSectorId('S-03-09'), { id: 'S-03-09', x: 3, y: 9 });
-  assert.throws(() => parseSectorId('S-64-00'), /outside/);
+test('registry ids support canonical Moon lots plus legacy donor sectors', () => {
+  assert.deepEqual(parseSectorId('MOON-360-180'), { id:'MOON-360-180',x:360,y:180,kind:'moon-lot' });
+  assert.deepEqual(parseSectorId('S-03-09'), { id:'S-03-09',x:3,y:9,kind:'legacy-sector' });
+  assert.throws(() => parseSectorId('MOON-720-000'), /outside/);
   assert.throws(() => parseSectorId('3,9'), /must look like/);
 });
 
@@ -36,10 +37,10 @@ test('semantic snapshot intentionally excludes email and purchase authority', ()
     panX: 10,
     panY: -4,
     mode: 'select',
-    selected: new Set(['S-01-01']),
+    selected: new Set(['MOON-001-001']),
     quote: { count: 1, total: 2, unavailable: [] },
     user: { email: 'private@example.com', brand: 'Acme' },
-    activeClaim: { id: 'claim_1', brand: 'Acme', sectors: ['S-01-01'], url: 'https://example.com' }
+    activeClaim: { id: 'claim_1', brand: 'Acme', sectors: ['MOON-001-001'], url: 'https://example.com' }
   });
   assert.deepEqual(snapshot.user, { signedIn: true, brand: 'Acme' });
   assert.equal('email' in snapshot.user, false);
