@@ -69,11 +69,12 @@ export async function handlePaymentApi(req, res, url) {
         tagline,
         url: claimUrl,
         sectors: quote.lines.map((x) => x.id),
-        amountCents: quote.total * 100,
+        pricesCents: quote.lines.map((x) => x.priceCents),
+        amountCents: quote.totalCents,
       });
       const checkout = await createCheckoutSession({
         reservationId,
-        amountCents: quote.total * 100,
+        amountCents: quote.totalCents,
         sectorCount: quote.count,
         brand,
       });
