@@ -1,0 +1,64 @@
+name: Certify Vercel Preview
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  certify-preview:
+    runs-on: ubuntu-latest
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Repository tests
+        run: npm test
+
+      - name: Repository syntax checks
+        run: npm run check
+
+      - name: Require Vercel release credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$VERCEL_TOKEN" || { echo "VERCEL_TOKEN is required"; exit 1; }
+          test -n "$VERCEL_ORG_ID" || { echo "VERCEL_ORG_ID is required"; exit 1; }
+          test -n "$VERCEL_PROJECT_ID" || { echo "VERCEL_PROJECT_ID is required"; exit 1; }
+
+      - name: Pull Vercel preview environment
+        run: npx --yes vercel@59.20.0 pull --yes --environment=preview --token="$VERCEL_TOKEN"
+
+      - name: Build exact head
+        run: npx --yes vercel@59.20.0 build --token="$VERCEL_TOKEN"
+
+      - name: Deploy exact-head preview
+        id: deploy
+        shell: bash
+        run: |
+          set -euo pipefail
+          url="$(npx --yes vercel@59.20.0 deploy --prebuilt --token="$VERCEL_TOKEN")"
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "Preview: $url"
+
+      - name: Certify hosted runtime
+        env:
+          HOSTED_BASE_URL: ${{ steps.deploy.outputs.url }}
+        run: node scripts/verify-hosted.mjs
+
+      - name: Certification summary
+        run: |
+          echo "### Atlas 259 Vercel preview" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Commit: \`${GITHUB_SHA}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Preview: ${{ steps.deploy.outputs.url }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Repository tests: passed" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Hosted health/bootstrap/body/admin probes: passed" >> "$GITHUB_STEP_SUMMARY"
+          echo "- This certifies a preview only; it does not promote production." >> "$GITHUB_STEP_SUMMARY"
