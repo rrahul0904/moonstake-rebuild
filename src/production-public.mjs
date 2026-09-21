@@ -6,7 +6,7 @@ import { boardFromClaims, claimStats, clientIp, json, readBody, sessionUser } fr
 
 export async function handlePublicApi(req, res, url) {
   if (req.method === 'GET' && url.pathname === '/api/health') {
-    return json(res, 200, { ok: true, service: 'moonstake', mode: 'production', time: new Date().toISOString() });
+    return json(res, 200, { ok: true, service: 'atlas259', mode: 'production', time: new Date().toISOString() });
   }
 
   if (req.method === 'GET' && url.pathname === '/api/celestial-bodies') {
