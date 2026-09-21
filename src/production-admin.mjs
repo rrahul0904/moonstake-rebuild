@@ -1,4 +1,4 @@
-import { getAdminClaim, listAdminClaims, recordClaimRefund, updateModeration } from './supabase.mjs';
+import { getAdminClaim, listAdminClaims, listAuthUsers, recordClaimRefund, updateModeration } from './supabase.mjs';
 import { createRefund } from './stripe.mjs';
 import { adminAllowed, json, readBody, sessionUser } from './production-common.mjs';
 
@@ -12,6 +12,33 @@ async function requireAdmin(req, res) {
 }
 
 export async function handleAdminApi(req, res, url) {
+  if (req.method === 'GET' && url.pathname === '/api/admin/users') {
+    const auth = await requireAdmin(req, res);
+    if (!auth) return true;
+    const [users, claims] = await Promise.all([listAuthUsers(), listAdminClaims()]);
+    const activity = new Map();
+    for (const claim of claims || []) {
+      const row = activity.get(claim.user_id) || { claims: 0, grossPaidCents: 0, activeClaims: 0, views: 0, clicks: 0 };
+      row.claims += 1;
+      row.grossPaidCents += claim.status === 'refunded' ? 0 : Number(claim.amount_cents || 0);
+      row.activeClaims += claim.status === 'active' ? 1 : 0;
+      row.views += Number(claim.views || 0);
+      row.clicks += Number(claim.clicks || 0);
+      activity.set(claim.user_id, row);
+    }
+    const rows = (users || []).map((user) => ({
+      id: user.id,
+      email: user.email || '',
+      brand: user.user_metadata?.brand || '',
+      createdAt: user.created_at || null,
+      lastSignInAt: user.last_sign_in_at || null,
+      emailConfirmedAt: user.email_confirmed_at || null,
+      ...(activity.get(user.id) || { claims: 0, grossPaidCents: 0, activeClaims: 0, views: 0, clicks: 0 }),
+    }));
+    json(res, 200, { users: rows });
+    return true;
+  }
+
   if (req.method === 'GET' && url.pathname === '/api/admin/claims') {
     const auth = await requireAdmin(req, res);
     if (!auth) return true;
