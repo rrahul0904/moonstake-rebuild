@@ -248,3 +248,9 @@ export async function recordMldLotEvent({ lotId, kind }) {
     p_lot_id:lotId, p_kind:kind
   }});
 }
+
+
+export async function listMldLotTransactions(lotId, limit=25) {
+  const safe=Math.max(1,Math.min(100,Number(limit)||25));
+  return request(`/rest/v1/mld_transactions?lot_id=eq.${encodeURIComponent(lotId)}&select=id,kind,gross_cents,previous_paid_cents,gain_cents,seller_payout_cents,mld_fee_cents,created_at&order=created_at.desc&limit=${safe}`);
+}
