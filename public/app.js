@@ -30,6 +30,7 @@ const state = {
   activeClaim: null,
   authMode: 'signin',
   pendingClaimAfterAuth: false,
+  pendingOfferLot: null,
   moon: null
 };
 
@@ -210,19 +211,36 @@ async function bootstrap(){
 
 function renderAuthState(){const btn=$('#signin-btn');if(state.user){btn.textContent=state.user.brand||'Account';btn.title=state.user.email}else{btn.textContent='Sign in';btn.title=''}}
 function showModal(id){$('#modal-backdrop').classList.remove('hidden');$(id).classList.remove('hidden')}
-function closeModals(){$('#modal-backdrop').classList.add('hidden');$$('.modal').forEach(m=>m.classList.add('hidden'));$('#auth-error').classList.add('hidden');$('#claim-error').classList.add('hidden')}
+function closeModals(){$('#modal-backdrop').classList.add('hidden');$('.modal').forEach(m=>m.classList.add('hidden'));$('#auth-error').classList.add('hidden');$('#claim-error').classList.add('hidden');$('#offer-error')?.classList.add('hidden')}
 function toast(message){const t=$('#toast');t.textContent=message;t.classList.remove('hidden');clearTimeout(toast.timer);toast.timer=setTimeout(()=>t.classList.add('hidden'),2600)}
 
 function setAuthMode(mode){state.authMode=mode;const signup=mode==='signup';$('#auth-signin-tab').classList.toggle('active',!signup);$('#auth-signup-tab').classList.toggle('active',signup);$('#brand-field').classList.toggle('hidden',!signup);$('#auth-title').textContent=signup?'Create your Atlas 259 account':'Sign in to register a position';$('#auth-password').autocomplete=signup?'new-password':'current-password'}
 function openAuth(){setAuthMode('signin');showModal('#auth-modal')}
-function openClaim(){if(!state.selected.size)return;if(!state.user){state.pendingClaimAfterAuth=true;openAuth();return}$('#claim-brand').value=state.user.brand||'';$('#claim-tagline').value='';$('#claim-url').value='';$('#claim-summary').textContent=`${state.selected.size} registry position${state.selected.size===1?'':'s'} · demo checkout`;$('#claim-total').textContent=`$${state.quote.total}`;showModal('#claim-modal')}
+function openClaim(){if(!state.selected.size)return;if(!state.user){state.pendingClaimAfterAuth=true;openAuth();return}$('#claim-brand').value=state.user.brand||'';$('#claim-tagline').value='';$('#claim-url').value='';$('#claim-summary').textContent=`${state.selected.size} registry position${state.selected.size===1?'':'s'} · demo checkout`;$('#claim-total').textContent=`${state.quote.total}`;showModal('#claim-modal')}
+
+async function openOffer(lotId){
+  if(!state.user){state.pendingOfferLot=lotId;openAuth();return}
+  try{
+    const data=await api(`/api/lots/${encodeURIComponent(lotId)}/market`);
+    const last=Number(data.lot.lastPaidCents)/100;
+    const min=Number(data.offer.minimumCents)/100;
+    const suggested=Number(data.offer.suggestedCents)/100;
+    $('#offer-lot-id').value=lotId;
+    $('#offer-amount').min=min.toFixed(2);
+    $('#offer-amount').value=suggested.toFixed(2);
+    $('#offer-market-summary').textContent=`${lotId} · last paid ${last.toFixed(2)} · minimum ${min.toFixed(2)} · suggested ${suggested.toFixed(2)}`;
+    $('#offer-error').classList.add('hidden');
+    showModal('#offer-modal');
+  }catch(err){toast(err.message)}
+}
 
 async function refresh(){const data=await api('/api/bootstrap');state.claims=data.claims;state.stats=data.stats;state.user=data.user;updateStats();renderAuthState();draw()}
 
 function positionFlagCard(claim,id){
   state.activeClaim=claim;const first=id||claim.sectors[0];const pos=displayCoords(first);if(!pos)return;const r=sectorRect(pos.x,pos.y);const card=$('#flag-card');
-  card.innerHTML=`<button class="flag-close" aria-label="Close">×</button><h3>${escapeHtml(claim.brand)}</h3><p>${escapeHtml(claim.tagline||'A registry marker on the Moon.')}</p><div class="flag-meta"><span>${claim.sectors.length} position${claim.sectors.length===1?'':'s'}</span><span>${claim.views||0} views · ${claim.clicks||0} clicks</span></div>${claim.url?`<a href="${escapeAttr(claim.url)}" target="_blank" rel="noopener noreferrer">Visit ${escapeHtml(claim.brand)} ↗</a>`:''}`;
-  const left=Math.min(canvas.clientWidth-285,Math.max(12,r.x+14));const top=Math.min(canvas.clientHeight-250,Math.max(92,r.y-36));card.style.left=`${left}px`;card.style.top=`${top}px`;card.classList.remove('hidden');card.querySelector('.flag-close').onclick=()=>card.classList.add('hidden');const link=card.querySelector('a');if(link)link.addEventListener('click',()=>api('/api/events/click',{method:'POST',body:JSON.stringify({claimId:claim.id})}).catch(()=>{}));api('/api/events/view',{method:'POST',body:JSON.stringify({claimId:claim.id})}).then(refresh).catch(()=>{});
+  const marketButton=/^MOON-\d{3}-\d{3}$/.test(first)?`<button class="ghost-btn" data-offer-lot="${escapeAttr(first)}">Make offer</button>`:'';
+  card.innerHTML=`<button class="flag-close" aria-label="Close">×</button><h3>${escapeHtml(claim.brand)}</h3><p>${escapeHtml(claim.tagline||'A registry marker on the Moon.')}</p><div class="flag-meta"><span>${claim.sectors.length} position${claim.sectors.length===1?'':'s'}</span><span>${claim.views||0} views · ${claim.clicks||0} clicks</span></div>${claim.url?`<a href="${escapeAttr(claim.url)}" target="_blank" rel="noopener noreferrer">Visit ${escapeHtml(claim.brand)} ↗</a>`:''}${marketButton}`;
+  const left=Math.min(canvas.clientWidth-285,Math.max(12,r.x+14));const top=Math.min(canvas.clientHeight-250,Math.max(92,r.y-36));card.style.left=`${left}px`;card.style.top=`${top}px`;card.classList.remove('hidden');card.querySelector('.flag-close').onclick=()=>card.classList.add('hidden');const link=card.querySelector('a');if(link)link.addEventListener('click',()=>api('/api/events/click',{method:'POST',body:JSON.stringify({claimId:claim.id})}).catch(()=>{}));const offer=card.querySelector('[data-offer-lot]');if(offer)offer.onclick=()=>openOffer(offer.dataset.offerLot);api('/api/events/view',{method:'POST',body:JSON.stringify({claimId:claim.id})}).then(refresh).catch(()=>{});
 }
 
 function escapeHtml(v){return String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
@@ -252,6 +270,36 @@ async function showPanel(tab){
       $('#panel-content').innerHTML=`<div class="panel-empty">${escapeHtml(e.message)}</div>`;
     }
   }
+  if(tab==='offers'){
+    $('#panel-kicker').textContent='SECONDARY MARKET';
+    $('#panel-title').textContent='Your offers';
+    if(!state.user){
+      $('#panel-content').innerHTML='<div class="panel-empty">Sign in to see offers you sent and received.<div class="panel-cta"><button id="offers-signin" class="claim-btn">Sign in</button></div></div>';
+      $('#offers-signin').onclick=openAuth;
+      return;
+    }
+    try{
+      const data=await api('/api/offers/mine');
+      const payout=data.payout||{};
+      const payoutText=payout.resale_payout_ready?'Seller payouts ready':`Seller payouts: ${payout.onboarding_status||'not started'}`;
+      const received=(data.received||[]).map(o=>{
+        const action=o.status==='pending'
+          ? `<button class="ghost-btn" data-accept-offer="${o.id}" ${payout.resale_payout_ready?'':'disabled'}>Accept</button>`
+          : '';
+        return `<div class="mine-row"><span class="rank">↓</span><div class="row-copy"><strong>${escapeHtml(o.lot_id)} · ${(Number(o.amount_cents)/100).toFixed(2)}</strong><small>Received · ${escapeHtml(o.status)}${o.payment_due_at?' · pay by '+new Date(o.payment_due_at).toLocaleString():''}</small></div><div class="row-metrics">${action}</div></div>`;
+      }).join('');
+      const sent=(data.sent||[]).map(o=>{
+        let action='';
+        if(o.status==='pending')action=`<button class="ghost-btn" data-withdraw-offer="${o.id}">Withdraw</button>`;
+        if(o.status==='accepted_pending_payment')action=`<button class="claim-btn" data-pay-offer="${o.id}">Pay</button>`;
+        return `<div class="mine-row"><span class="rank">↑</span><div class="row-copy"><strong>${escapeHtml(o.lot_id)} · ${(Number(o.amount_cents)/100).toFixed(2)}</strong><small>Sent · ${escapeHtml(o.status)}${o.payment_due_at?' · pay by '+new Date(o.payment_due_at).toLocaleString():''}</small></div><div class="row-metrics">${action}</div></div>`;
+      }).join('');
+      $('#panel-content').innerHTML=`<div class="panel-empty">${escapeHtml(payoutText)}${payout.resale_payout_ready?'':' · payout onboarding must be enabled before you can accept cash resale offers.'}</div><div class="panel-section"><strong>Received</strong>${received||'<div class="panel-empty">No received offers.</div>'}</div><div class="panel-section"><strong>Sent</strong>${sent||'<div class="panel-empty">No sent offers.</div>'}</div>`;
+      $('[data-withdraw-offer]').forEach(btn=>btn.onclick=async()=>{try{await api(`/api/offers/${btn.dataset.withdrawOffer}/withdraw`,{method:'POST'});toast('Offer withdrawn');showPanel('offers')}catch(e){toast(e.message)}});
+      $('[data-accept-offer]').forEach(btn=>btn.onclick=async()=>{try{await api(`/api/offers/${btn.dataset.acceptOffer}/accept`,{method:'POST'});toast('Offer accepted · waiting for buyer payment');showPanel('offers')}catch(e){toast(e.message)}});
+      $('[data-pay-offer]').forEach(btn=>btn.onclick=async()=>{try{const out=await api(`/api/offers/${btn.dataset.payOffer}/checkout`,{method:'POST'});location.href=out.payment.url}catch(e){toast(e.message)}});
+    }catch(e){$('#panel-content').innerHTML=`<div class="panel-empty">${escapeHtml(e.message)}</div>`}
+  }
   if(tab==='land'){ $('#panel-kicker').textContent='MY LAND';$('#panel-title').textContent=state.user?state.user.brand:'Your place on the Moon';if(!state.user){$('#panel-content').innerHTML='<div class="panel-empty">Sign in to see every registry position you hold, plus views and click-throughs.<div class="panel-cta"><button id="panel-signin" class="claim-btn">Sign in</button></div></div>';$('#panel-signin').onclick=openAuth;return}try{const data=await api('/api/my-land');$('#panel-content').innerHTML=data.claims.length?data.claims.map(c=>`<div class="mine-row" data-mine="${c.id}"><span class="rank">⚑</span><div class="row-copy"><strong>${escapeHtml(c.brand)}</strong><small>${c.sectors.length} positions · $${c.amount} claimed</small></div><div class="row-metrics">${c.views||0}<small>views · ${c.clicks||0} clicks</small></div></div>`).join(''):'<div class="panel-empty">You have not registered a position yet. Close this panel, select a position, and place your first marker.</div>';$$('[data-mine]').forEach(el=>el.onclick=()=>{const c=state.claims.find(x=>x.id===el.dataset.mine);if(c){const [,x,y]=c.sectors[0].split('-');focusSector(+x,+y);positionFlagCard(c)}})}catch(e){$('#panel-content').innerHTML=`<div class="panel-empty">${escapeHtml(e.message)}</div>`}}
 }
 function setTabActive(tab){$$('.tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab))}
@@ -264,7 +312,20 @@ canvas.addEventListener('wheel',e=>{e.preventDefault();zoomAt(e.deltaY<0?1.13:.8
 
 $('#mode-move').onclick=()=>setMode('move');$('#mode-select').onclick=()=>setMode('select');$('#zoom-in').onclick=()=>zoomAt(1.28);$('#zoom-out').onclick=()=>zoomAt(.78);$('#whole-moon').onclick=()=>{state.zoom=1;state.panX=0;state.panY=0;draw()};$('#buy-lots').onclick=()=>{setMode('select');if(state.zoom<1.45)zoomAt(1.6)};$('#clear-selection').onclick=()=>{state.selected.clear();state.quote={count:0,total:0,unavailable:[]};renderSelection();draw()};$('#claim-btn').onclick=openClaim;$('#how-btn').onclick=()=>showModal('#how-modal');$('#signin-btn').onclick=async()=>{if(!state.user)return openAuth();const panel=$('#side-panel');if(panel.classList.contains('hidden'))showPanel('land');else{await api('/api/auth/signout',{method:'POST'});await refresh();toast('Signed out')}};$('#modal-backdrop').onclick=closeModals;$$('[data-close-modal]').forEach(b=>b.onclick=closeModals);$('#auth-signin-tab').onclick=()=>setAuthMode('signin');$('#auth-signup-tab').onclick=()=>setAuthMode('signup');$('#panel-close').onclick=()=>{$('#side-panel').classList.add('hidden');setTabActive('plot')};$$('.tab').forEach(b=>b.onclick=()=>{if(b.dataset.tab==='plot'){$('#side-panel').classList.add('hidden');setTabActive('plot')}else showPanel(b.dataset.tab)});
 
-$('#auth-form').addEventListener('submit',async e=>{e.preventDefault();const error=$('#auth-error');error.classList.add('hidden');const body={email:$('#auth-email').value,password:$('#auth-password').value,brand:$('#auth-brand').value};try{const data=await api(state.authMode==='signup'?'/api/auth/signup':'/api/auth/signin',{method:'POST',body:JSON.stringify(body)});state.user=data.user;renderAuthState();closeModals();toast(`Welcome ${state.user.brand}`);if(state.pendingClaimAfterAuth){state.pendingClaimAfterAuth=false;setTimeout(openClaim,150)}}catch(err){error.textContent=err.message;error.classList.remove('hidden')}});
+$('#auth-form').addEventListener('submit',async e=>{e.preventDefault();const error=$('#auth-error');error.classList.add('hidden');const body={email:$('#auth-email').value,password:$('#auth-password').value,brand:$('#auth-brand').value};try{const data=await api(state.authMode==='signup'?'/api/auth/signup':'/api/auth/signin',{method:'POST',body:JSON.stringify(body)});state.user=data.user;renderAuthState();closeModals();toast(`Welcome ${state.user.brand}`);if(state.pendingClaimAfterAuth){state.pendingClaimAfterAuth=false;setTimeout(openClaim,150)}else if(state.pendingOfferLot){const lot=state.pendingOfferLot;state.pendingOfferLot=null;setTimeout(()=>openOffer(lot),150)}}catch(err){error.textContent=err.message;error.classList.remove('hidden')}});
+
+$('#offer-form').addEventListener('submit',async e=>{
+  e.preventDefault();
+  const error=$('#offer-error');error.classList.add('hidden');
+  const lotId=$('#offer-lot-id').value;
+  const amountCents=Math.round(Number($('#offer-amount').value)*100);
+  try{
+    await api('/api/offers',{method:'POST',body:JSON.stringify({lotId,amountCents})});
+    closeModals();
+    toast('Offer placed · no charge until accepted and you choose to pay');
+    showPanel('offers');
+  }catch(err){error.textContent=err.message;error.classList.remove('hidden')}
+});
 
 $('#claim-form').addEventListener('submit',async e=>{e.preventDefault();const error=$('#claim-error');error.classList.add('hidden');try{const data=await api('/api/claims',{method:'POST',body:JSON.stringify({brand:$('#claim-brand').value,tagline:$('#claim-tagline').value,url:$('#claim-url').value,sectors:[...state.selected]})});closeModals();state.selected.clear();state.quote={count:0,total:0,unavailable:[]};renderSelection();await refresh();const claim=state.claims.find(c=>c.id===data.claim.id)||data.claim;positionFlagCard(claim);toast('Registry position added on the Moon')}catch(err){error.textContent=err.message;error.classList.remove('hidden')}});
 
