@@ -1,3 +1,11 @@
+import {
+  SEMANTIC_API_VERSION,
+  buildSemanticSnapshot,
+  clampSemanticZoom,
+  parseSectorId,
+  searchSemanticEntities
+} from './semantic-contract.js';
+
 const canvas = document.querySelector('#moon-canvas');
 const ctx = canvas.getContext('2d');
 const $ = (s) => document.querySelector(s);
@@ -225,5 +233,99 @@ $('#auth-form').addEventListener('submit',async e=>{e.preventDefault();const err
 $('#claim-form').addEventListener('submit',async e=>{e.preventDefault();const error=$('#claim-error');error.classList.add('hidden');try{const data=await api('/api/claims',{method:'POST',body:JSON.stringify({brand:$('#claim-brand').value,tagline:$('#claim-tagline').value,url:$('#claim-url').value,sectors:[...state.selected]})});closeModals();state.selected.clear();state.quote={count:0,total:0,unavailable:[]};renderSelection();await refresh();const claim=state.claims.find(c=>c.id===data.claim.id)||data.claim;positionFlagCard(claim);toast('Flag planted on the Moon')}catch(err){error.textContent=err.message;error.classList.remove('hidden')}});
 
 const search=$('#search');search.addEventListener('input',()=>{const q=search.value.trim().toLowerCase();const box=$('#search-results');if(!q){box.classList.add('hidden');return}const landmarks=state.landmarks.filter(l=>`${l.name} ${l.subtitle}`.toLowerCase().includes(q)).slice(0,5);const brands=state.claims.filter(c=>`${c.brand} ${c.tagline}`.toLowerCase().includes(q)).slice(0,5);const rows=[...landmarks.map(l=>({kind:'landmark',id:l.id,title:l.name,sub:l.subtitle})),...brands.map(c=>({kind:'claim',id:c.id,title:c.brand,sub:c.tagline||'Brand flag'}))];box.innerHTML=rows.length?rows.map(r=>`<button class="search-result" data-kind="${r.kind}" data-id="${r.id}"><span>${escapeHtml(r.title)}</span><small>${escapeHtml(r.sub)}</small></button>`).join(''):'<button class="search-result" disabled><span>No results</span><small>Try Tycho or Apollo 11</small></button>';box.classList.remove('hidden');$$('.search-result[data-id]').forEach(btn=>btn.onclick=()=>{box.classList.add('hidden');search.value=btn.querySelector('span').textContent;if(btn.dataset.kind==='landmark'){const l=state.landmarks.find(x=>x.id===btn.dataset.id);focusSector(l.x,l.y,3.3)}else{const c=state.claims.find(x=>x.id===btn.dataset.id);const [,x,y]=c.sectors[0].split('-');focusSector(+x,+y,3);positionFlagCard(c)}})});document.addEventListener('click',e=>{if(!e.target.closest('.search-wrap'))$('#search-results').classList.add('hidden')});
+
+function semanticSnapshot(){
+  return buildSemanticSnapshot({
+    zoom: state.zoom,
+    panX: state.panX,
+    panY: state.panY,
+    mode: state.mode,
+    selected: state.selected,
+    quote: state.quote,
+    stats: state.stats,
+    activeClaim: state.activeClaim,
+    user: state.user
+  });
+}
+
+function semanticSearch(query){
+  return searchSemanticEntities(query,{landmarks:state.landmarks,claims:state.claims});
+}
+
+function semanticFocus(target){
+  const value=String(target||'').trim();
+  if(!value)throw new Error('Provide a landmark, brand, claim id, or sector id');
+  if(/^S-\d{2}-\d{2}$/.test(value)){
+    const sector=parseSectorId(value,GRID);
+    focusSector(sector.x,sector.y,Math.max(state.zoom,2.6));
+    return semanticSnapshot();
+  }
+  const normalized=value.toLowerCase();
+  const directClaim=state.claims.find(c=>c.id===value);
+  const match=directClaim
+    ? {kind:'claim',id:directClaim.id}
+    : semanticSearch(value).find(item=>String(item.title||'').toLowerCase()===normalized)||semanticSearch(value)[0];
+  if(!match)throw new Error(`No Moonstake result found for "${value}"`);
+  if(match.kind==='landmark'){
+    const landmark=state.landmarks.find(item=>item.id===match.id);
+    focusSector(landmark.x,landmark.y,3.3);
+  }else{
+    const claim=state.claims.find(item=>item.id===match.id);
+    if(!claim)throw new Error('Claim is no longer available');
+    const [,x,y]=claim.sectors[0].split('-');
+    focusSector(+x,+y,3);
+    positionFlagCard(claim);
+  }
+  return semanticSnapshot();
+}
+
+function semanticZoomTo(value){
+  state.zoom=clampSemanticZoom(value);
+  clampPan();
+  draw();
+  return semanticSnapshot();
+}
+
+async function semanticSelectSector(id,{append=true}={}){
+  const sector=parseSectorId(id,GRID);
+  const claim=sectorClaim(sector.id);
+  if(claim)throw new Error(`${sector.id} is already claimed by ${claim.brand}`);
+  setMode('select');
+  if(!append)state.selected.clear();
+  state.selected.add(sector.id);
+  focusSector(sector.x,sector.y,Math.max(state.zoom,2.6));
+  draw();
+  await updateQuote();
+  return semanticSnapshot();
+}
+
+function semanticClearSelection(){
+  state.selected.clear();
+  state.quote={count:0,total:0,unavailable:[]};
+  renderSelection();
+  draw();
+  return semanticSnapshot();
+}
+
+function semanticResetView(){
+  state.zoom=1;
+  state.panX=0;
+  state.panY=0;
+  setMode('move');
+  draw();
+  return semanticSnapshot();
+}
+
+window.moonstakeSemantic=Object.freeze({
+  version:SEMANTIC_API_VERSION,
+  snapshot:semanticSnapshot,
+  search:semanticSearch,
+  focus:semanticFocus,
+  zoomTo:semanticZoomTo,
+  selectSector:semanticSelectSector,
+  clearSelection:semanticClearSelection,
+  resetView:semanticResetView
+});
+document.dispatchEvent(new CustomEvent('moonstake:semantic-ready',{detail:{version:SEMANTIC_API_VERSION}}));
 
 buildMoonTexture();addEventListener('resize',resize);resize();renderSelection();bootstrap().catch(err=>{console.error(err);$('#boot').innerHTML=`<strong>MOONSTAKE</strong><span>Could not light the far side.</span><button class="ghost-btn" onclick="location.reload()">Try again</button>`});
