@@ -255,9 +255,29 @@ function focusSector(x,y,targetZoom=2.6){
   state.zoom=targetZoom;const m=moonGeometry();const desiredX=canvas.clientWidth/2,desiredY=canvas.clientHeight/2+30;const r=sectorRect(x,y);state.panX += desiredX-(r.x+r.w/2);state.panY += desiredY-(r.y+r.h/2);clampPan();draw();
 }
 
+function indexSparkline(points=[]){
+  if(!points.length)return '<div class="panel-empty">Moon Index history begins with the first paid registry transaction.</div>';
+  const values=points.map(p=>Number(p.index_value));
+  const min=Math.min(...values),max=Math.max(...values),span=Math.max(.0001,max-min);
+  const width=320,height=90,pad=8;
+  const coords=values.map((v,i)=>{
+    const x=pad+(i/Math.max(1,values.length-1))*(width-pad*2);
+    const y=height-pad-((v-min)/span)*(height-pad*2);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+  const last=points[points.length-1];
+  return `<div class="claim"><div class="head"><div><div class="brand">Moon Index ${Number(last.index_value).toFixed(2)}</div><div class="meta">${points.length} immutable transaction snapshot${points.length===1?'':'s'} · GMV ${(Number(last.gross_market_volume_cents)/100).toLocaleString()}</div></div></div><svg viewBox="0 0 ${width} ${height}" width="100%" height="${height}" role="img" aria-label="Moon Index history"><polyline points="${coords}" fill="none" stroke="currentColor" stroke-width="2" vector-effect="non-scaling-stroke"/></svg><div class="meta">Formula version: moon-index-v1 · snapshot written by transaction trigger</div></div>`;
+}
+
 async function showPanel(tab){
   const panel=$('#side-panel');panel.classList.remove('hidden');$$('.tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));
-  if(tab==='board'){ $('#panel-kicker').textContent='THE BOARD';$('#panel-title').textContent='Brands on the Moon';const data=await api('/api/board');$('#panel-content').innerHTML=data.board.length?data.board.map((row,i)=>`<div class="board-row" data-claim="${row.id}"><span class="rank">${String(i+1).padStart(2,'0')}</span><div class="row-copy"><strong>${escapeHtml(row.brand)}</strong><small>${escapeHtml(row.tagline||'No tagline yet')}</small></div><div class="row-metrics">${row.views} <small>views · ${row.clicks} clicks</small></div></div>`).join(''):'<div class="panel-empty">No brands are on the board yet.</div>';$$('[data-claim]').forEach(el=>el.onclick=()=>{const c=state.claims.find(x=>x.id===el.dataset.claim);if(c){const pos=displayCoords(c.sectors[0]);if(pos){focusSector(pos.x,pos.y);positionFlagCard(c);}}})}
+  if(tab==='board'){
+    $('#panel-kicker').textContent='THE BOARD';$('#panel-title').textContent='Brands & Moon Index';
+    const [data,indexData]=await Promise.all([api('/api/board'),api('/api/index-history?limit=120').catch(()=>({points:[]}))]);
+    const boardRows=data.board.length?data.board.map((row,i)=>`<div class="board-row" data-claim="${row.id}"><span class="rank">${String(i+1).padStart(2,'0')}</span><div class="row-copy"><strong>${escapeHtml(row.brand)}</strong><small>${escapeHtml(row.tagline||'No tagline yet')}</small></div><div class="row-metrics">${row.views} <small>views · ${row.clicks} clicks</small></div></div>`).join(''):'<div class="panel-empty">No brands are on the board yet.</div>';
+    $('#panel-content').innerHTML=indexSparkline(indexData.points||[])+`<div class="panel-section">${boardRows}</div>`;
+    $('[data-claim]').forEach(el=>el.onclick=()=>{const c=state.claims.find(x=>x.id===el.dataset.claim);if(c){const pos=displayCoords(c.sectors[0]);if(pos){focusSector(pos.x,pos.y);positionFlagCard(c);}}});
+  }
   if(tab==='explore'){ $('#panel-kicker').textContent='EXPLORE';$('#panel-title').textContent='Landmarks & flags';const data=await api('/api/explore');$('#panel-content').innerHTML=`<div class="panel-section">${data.landmarks.map(l=>`<div class="land-row" data-landmark="${l.id}"><span class="rank">◎</span><div class="row-copy"><strong>${escapeHtml(l.name)}</strong><small>${escapeHtml(l.subtitle)}</small></div><div class="row-metrics">${l.lat.toFixed(1)}°<small>${l.lon.toFixed(1)}°</small></div></div>`).join('')}</div>`;$$('[data-landmark]').forEach(el=>el.onclick=()=>{const l=state.landmarks.find(x=>x.id===el.dataset.landmark);if(l){focusSector(l.lotX??l.x,l.lotY??l.y,3.2);panel.classList.add('hidden');setTabActive('plot')}})}
   if(tab==='worlds'){
     $('#panel-kicker').textContent='ATLAS 259';
