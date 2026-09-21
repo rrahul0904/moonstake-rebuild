@@ -260,3 +260,28 @@ export async function listMoonIndexHistory(limit=120) {
   const safe=Math.max(1,Math.min(1000,Number(limit)||120));
   return request(`/rest/v1/market_index_snapshots?body_id=eq.moon&select=index_value,gross_market_volume_cents,owned_lots,created_at&order=created_at.asc,id.asc&limit=${safe}`);
 }
+
+
+export async function addMldWatchlist({ userId, lotId }) {
+  return request('/rest/v1/mld_watchlist?on_conflict=user_id,lot_id', {
+    method:'POST',
+    headers:{ Prefer:'resolution=merge-duplicates,return=minimal' },
+    body:{ user_id:userId, lot_id:lotId }
+  });
+}
+
+export async function removeMldWatchlist({ userId, lotId }) {
+  return request(`/rest/v1/mld_watchlist?user_id=eq.${encodeURIComponent(userId)}&lot_id=eq.${encodeURIComponent(lotId)}`, {
+    method:'DELETE',
+    headers:{ Prefer:'return=minimal' }
+  });
+}
+
+export async function listMldWatchlist(userId) {
+  return request(`/rest/v1/mld_watchlist_directory?user_id=eq.${encodeURIComponent(userId)}&select=*&order=created_at.desc`);
+}
+
+export async function listRecentMldActivity(limit=40) {
+  const safe=Math.max(1,Math.min(100,Number(limit)||40));
+  return request(`/rest/v1/mld_transactions?select=lot_id,kind,gross_cents,previous_paid_cents,gain_cents,mld_fee_cents,created_at&order=created_at.desc&limit=${safe}`);
+}
