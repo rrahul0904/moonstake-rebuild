@@ -33,8 +33,9 @@ The paid ownership state machine is reservation → Stripe Checkout → signed w
 
 - Full-screen lunar map and responsive desktop/mobile UI
 - Mouse/touch pan, wheel zoom, Whole Moon reset
-- Move / Select modes and legacy 64 × 32 UI sector grid
-- canonical MLD economics model with 720 × 360 = 259,200 Moon lots
+- Move / Select modes on the canonical 720 × 360 = 259,200 Moon registry grid
+- progressive grid rendering so 259,200 addressable positions do not overwhelm the canvas
+- canonical MLD economics model with per-position pricing and ownership
 - generalized Solar System market model for solid-body surface lots versus gas-giant/star observation inventory
 - Server-authoritative pricing and premium sectors
 - Landmark and brand search
