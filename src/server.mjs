@@ -325,5 +325,5 @@ export const server = http.createServer(async (req, res) => {
 });
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  server.listen(PORT, HOST, () => console.log(`Moonstake rebuild running at http://${HOST}:${PORT}`));
+  server.listen(PORT, HOST, () => console.log(`Atlas 259 donor rebuild running at http://${HOST}:${PORT}`));
 }
