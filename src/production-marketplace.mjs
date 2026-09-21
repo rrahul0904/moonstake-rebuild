@@ -1,15 +1,18 @@
 import { offerGuidance } from './market-model.mjs';
 import {
   acceptMldOffer,
+  addMldWatchlist,
   attachMldOfferCheckout,
   createMldOffer,
   getMldLot,
   getMldLotMetrics,
   getMldOffer,
   getSellerPayoutReadiness,
+  listMldWatchlist,
   listReceivedMldOffers,
   listSentMldOffers,
   listMldLotTransactions,
+  removeMldWatchlist,
   withdrawMldOffer,
 } from './supabase.mjs';
 import { createResaleCheckoutSession } from './stripe.mjs';
@@ -51,15 +54,36 @@ export async function handleMarketplaceApi(req,res,url) {
     });
   }
 
+  if(req.method==='GET'&&url.pathname==='/api/watchlist'){
+    const auth=await sessionUser(req,res);
+    if(!auth)return json(res,401,{error:'Sign in required'});
+    return json(res,200,{watchlist:await listMldWatchlist(auth.user.id)});
+  }
+
+  if(req.method==='POST'&&url.pathname==='/api/watchlist'){
+    const auth=await sessionUser(req,res);
+    if(!auth)return json(res,401,{error:'Sign in required'});
+    const body=await readBody(req);
+    const lotId=validLotId(body.lotId);
+    const action=String(body.action||'add');
+    if(!lotId)return json(res,400,{error:'Invalid Moon registry position'});
+    if(!await getMldLot(lotId))return json(res,404,{error:'Only held positions can be watched'});
+    if(action==='remove')await removeMldWatchlist({userId:auth.user.id,lotId});
+    else if(action==='add')await addMldWatchlist({userId:auth.user.id,lotId});
+    else return json(res,400,{error:'Watchlist action must be add or remove'});
+    return json(res,200,{ok:true,action,lotId});
+  }
+
   if(req.method==='GET'&&url.pathname==='/api/offers/mine'){
     const auth=await sessionUser(req,res);
     if(!auth)return json(res,401,{error:'Sign in required'});
-    const [sent,received,payout]=await Promise.all([
+    const [sent,received,payout,watchlist]=await Promise.all([
       listSentMldOffers(auth.user.id),
       listReceivedMldOffers(auth.user.id),
       getSellerPayoutReadiness(auth.user.id),
+      listMldWatchlist(auth.user.id),
     ]);
-    return json(res,200,{sent,received,payout});
+    return json(res,200,{sent,received,payout,watchlist});
   }
 
   if(req.method==='POST'&&url.pathname==='/api/offers'){
