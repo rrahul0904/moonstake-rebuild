@@ -18,9 +18,14 @@ test('catalog separates solid surface markets from non-land observation inventor
   assert.equal(BODY_CATALOG.moon.inventoryMode, 'surface-lots');
   assert.equal(BODY_CATALOG.mars.inventoryMode, 'surface-lots');
   assert.equal(BODY_CATALOG.jupiter.inventoryMode, 'observation-zones');
+  assert.equal(BODY_CATALOG.uranus.inventoryMode, 'observation-zones');
+  assert.equal(BODY_CATALOG.neptune.inventoryMode, 'observation-zones');
   assert.equal(BODY_CATALOG.sun.inventoryMode, 'observation-zones');
+  assert.equal(BODY_CATALOG.earth.inventoryMode, 'reference-only');
   assert.ok(SOLID_BODY_IDS.includes('europa'));
   assert.ok(OBSERVATION_BODY_IDS.includes('saturn'));
+  assert.ok(OBSERVATION_BODY_IDS.includes('uranus'));
+  assert.ok(OBSERVATION_BODY_IDS.includes('neptune'));
 });
 
 test('all solid launch bodies preserve the 259,200 angular-address board', () => {
@@ -81,4 +86,10 @@ test('launch plan keeps the Moon first to protect liquidity', () => {
   assert.equal(plan[0].id, 'moon');
   assert.equal(plan[0].phase, 1);
   assert.ok(plan.find((x) => x.id === 'jupiter').phase > plan.find((x) => x.id === 'mars').phase);
+});
+
+
+test('Earth is reference-only and cannot expose synthetic land lots', () => {
+  assert.equal(BODY_CATALOG.earth.inventoryMode, 'reference-only');
+  assert.throws(() => bodyLotId('earth', 0, 0), /does not expose surface lots/);
 });
