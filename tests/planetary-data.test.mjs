@@ -6,7 +6,7 @@ import {
   buildFeatureStableKey,
   featureCanReceiveRegistryPremium,
   normalizeEastLongitude,
-  normalizeUsqsGazetteerFeature,
+  normalizeUsgsGazetteerFeature,
 } from '../src/planetary-data.mjs';
 
 test('planetary ingestion contract is versioned and uses one canonical coordinate convention',()=>{
@@ -26,7 +26,7 @@ test('east longitude converts deterministically from 0-360 to -180..180',()=>{
 });
 
 test('official feature import preserves provenance and maps to a stable registry position',()=>{
-  const feature=normalizeUsqsGazetteerFeature({
+  const feature=normalizeUsgsGazetteerFeature({
     bodyId:'mars',
     featureId:'12345',
     officialName:'Example Mons',
@@ -47,7 +47,7 @@ test('official feature import preserves provenance and maps to a stable registry
 });
 
 test('non-adopted nomenclature is excluded from premium inventory by default',()=>{
-  assert.throws(()=>normalizeUsqsGazetteerFeature({
+  assert.throws(()=>normalizeUsgsGazetteerFeature({
     bodyId:'mars',
     featureId:'draft-1',
     officialName:'Draft Feature',
@@ -59,7 +59,7 @@ test('non-adopted nomenclature is excluded from premium inventory by default',()
 });
 
 test('Earth remains reference-only in the commercial feature importer',()=>{
-  assert.throws(()=>normalizeUsqsGazetteerFeature({
+  assert.throws(()=>normalizeUsgsGazetteerFeature({
     bodyId:'earth',
     featureId:'1',
     officialName:'Example',
@@ -71,7 +71,7 @@ test('Earth remains reference-only in the commercial feature importer',()=>{
 });
 
 test('observation bodies keep official features without pretending they map to land lots',()=>{
-  const feature=normalizeUsqsGazetteerFeature({
+  const feature=normalizeUsgsGazetteerFeature({
     bodyId:'jupiter',
     featureId:'j-1',
     officialName:'Example Atmospheric Feature',
