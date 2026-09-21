@@ -10,7 +10,7 @@ create table if not exists public.mld_lots (
   purchase_count integer not null default 1 check (purchase_count >= 1),
   updated_at timestamptz not null default now(),
   unique (x, y),
-  check (lot_id = 'L-' || lpad(x::text, 3, '0') || '-' || lpad(y::text, 3, '0'))
+  check (lot_id = 'MOON-' || lpad(x::text, 3, '0') || '-' || lpad(y::text, 3, '0'))
 );
 
 create table if not exists public.mld_offers (
@@ -34,7 +34,7 @@ create table if not exists public.mld_transactions (
   gain_cents integer not null check (gain_cents >= 0),
   seller_payout_cents integer not null default 0 check (seller_payout_cents >= 0),
   mld_fee_cents integer not null check (mld_fee_cents >= 0),
-  stripe_payment_intent_id text unique,
+  stripe_payment_intent_id text,
   payout_status text not null default 'not_applicable' check (payout_status in ('not_applicable','pending','paid','failed')),
   created_at timestamptz not null default now(),
   check (seller_payout_cents + mld_fee_cents = gross_cents)
@@ -52,6 +52,7 @@ create index if not exists idx_mld_offers_lot_status on public.mld_offers(lot_id
 create index if not exists idx_mld_offers_buyer on public.mld_offers(buyer_user_id, created_at desc);
 create index if not exists idx_mld_transactions_lot on public.mld_transactions(lot_id, created_at desc);
 create index if not exists idx_mld_transactions_created on public.mld_transactions(created_at desc);
+create unique index if not exists idx_mld_transactions_payment_lot on public.mld_transactions(stripe_payment_intent_id, lot_id) where stripe_payment_intent_id is not null;
 
 alter table public.mld_lots enable row level security;
 alter table public.mld_offers enable row level security;
@@ -98,7 +99,7 @@ set search_path = public
 as $$
 begin
   if p_x < 0 or p_x > 719 or p_y < 0 or p_y > 359 then raise exception 'lot outside board'; end if;
-  if p_lot_id <> 'L-' || lpad(p_x::text, 3, '0') || '-' || lpad(p_y::text, 3, '0') then raise exception 'lot id mismatch'; end if;
+  if p_lot_id <> 'MOON-' || lpad(p_x::text, 3, '0') || '-' || lpad(p_y::text, 3, '0') then raise exception 'lot id mismatch'; end if;
   if p_amount_cents < 100 then raise exception 'primary sale must be at least $1'; end if;
   if exists(select 1 from public.mld_lots where lot_id = p_lot_id) then raise exception 'lot already owned'; end if;
 
