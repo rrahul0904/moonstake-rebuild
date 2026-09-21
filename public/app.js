@@ -283,21 +283,11 @@ async function showPanel(tab){
     $('#panel-kicker').textContent='THE BOARD';$('#panel-title').textContent='Brands & Moon Index';
     const [data,indexData,activityData]=await Promise.all([api('/api/board'),api('/api/index-history?limit=120').catch(()=>({points:[]})),api('/api/activity?limit=12').catch(()=>({activity:[]}))]);
     const boardRows=data.board.length?data.board.map((row,i)=>`<div class="board-row" data-claim="${row.id}"><span class="rank">${String(i+1).padStart(2,'0')}</span><div class="row-copy"><strong>${escapeHtml(row.brand)}</strong><small>${escapeHtml(row.tagline||'No tagline yet')}</small></div><div class="row-metrics">${row.views} <small>views · ${row.clicks} clicks</small></div></div>`).join(''):'<div class="panel-empty">No brands are on the board yet.</div>';
-    const activity=(activityData.activity||[]).map(x=>`<div class="land-row"><span class="rank">${x.kind==='resale'?'↻':'+'}</span><div class="row-copy"><strong>${escapeHtml(x.lot_id)}</strong><small>${String(x.kind).replace('_',' ')} · ${new Date(x.created_at).toLocaleString()}</small></div><div class="row-metrics">${(Number(x.gross_cents)/100).toFixed(2)}<small>${x.kind==='resale'?' · gain 
-    $('[data-claim]').forEach(el=>el.onclick=()=>{const c=state.claims.find(x=>x.id===el.dataset.claim);if(c){const pos=displayCoords(c.sectors[0]);if(pos){focusSector(pos.x,pos.y);positionFlagCard(c);}}});
-  }
-  if(tab==='explore'){ $('#panel-kicker').textContent='EXPLORE';$('#panel-title').textContent='Landmarks & flags';const data=await api('/api/explore');$('#panel-content').innerHTML=`<div class="panel-section">${data.landmarks.map(l=>`<div class="land-row" data-landmark="${l.id}"><span class="rank">◎</span><div class="row-copy"><strong>${escapeHtml(l.name)}</strong><small>${escapeHtml(l.subtitle)}</small></div><div class="row-metrics">${l.lat.toFixed(1)}°<small>${l.lon.toFixed(1)}°</small></div></div>`).join('')}</div>`;$$('[data-landmark]').forEach(el=>el.onclick=()=>{const l=state.landmarks.find(x=>x.id===el.dataset.landmark);if(l){focusSector(l.lotX??l.x,l.lotY??l.y,3.2);panel.classList.add('hidden');setTabActive('plot')}})}
-  if(tab==='worlds'){
-    $('#panel-kicker').textContent='ATLAS 259';
-    $('#panel-title').textContent='Registry of worlds';
-    try{
-      const data=await api('/api/celestial-bodies');
-      const rows=data.bodies.map(body=>{
-        const live=body.enabled;
-        const mode=body.inventoryMode==='surface-lots'?'surface registry':'observation registry';
-        const lots=body.totalLots?Number(body.totalLots).toLocaleString()+' positions':mode;
-        return `<div class="land-row"><span class="rank">${live?'●':'○'}</span><div class="row-copy"><strong>${escapeHtml(body.name)}${live?' · LIVE':''}</strong><small>Phase ${body.phase} · ${escapeHtml(mode)}</small></div><div class="row-metrics">${escapeHtml(lots)}<small>${live?'open now':'locked'}</small></div></div>`;
-      }).join('');
+    const activity=(activityData.activity||[]).map(x=>{
+      const amount=(Number(x.gross_cents)/100).toFixed(2);
+      const gain=x.kind==='resale' ? ` · gain $${(Number(x.gain_cents)/100).toFixed(2)}` : '';
+      return `<div class="land-row"><span class="rank">${x.kind==='resale'?'↻':'+'}</span><div class="row-copy"><strong>${escapeHtml(x.lot_id)}</strong><small>${String(x.kind).replace('_',' ')} · ${new Date(x.created_at).toLocaleString()}</small></div><div class="row-metrics">$${amount}<small>${gain}</small></div></div>`;
+    }).join('');
       $('#panel-content').innerHTML=`<div class="panel-section">${rows}</div><div class="panel-empty">The Moon stays the first live market. New worlds unlock in phases so Atlas 259 does not dilute attention or scarcity by opening the whole Solar System at once.</div>`;
     }catch(e){
       $('#panel-content').innerHTML=`<div class="panel-empty">${escapeHtml(e.message)}</div>`;
