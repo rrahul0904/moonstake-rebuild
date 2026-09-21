@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import { LANDMARKS, quoteSectors } from './pricing.mjs';
-import { insertEvent, listClaims, listUnavailableSectorIds } from './supabase.mjs';
+import { MLD_MARKET } from './market-model.mjs';
+import { getMldMarketSummary, insertEvent, listClaims, listUnavailableSectorIds } from './supabase.mjs';
 import { boardFromClaims, claimStats, clientIp, json, readBody, sessionUser } from './production-common.mjs';
 
 export async function handlePublicApi(req, res, url) {
@@ -9,13 +10,17 @@ export async function handlePublicApi(req, res, url) {
   }
 
   if (req.method === 'GET' && url.pathname === '/api/bootstrap') {
-    const [rows, auth] = await Promise.all([listClaims(), sessionUser(req, res)]);
+    const [rows, auth, marketSummary] = await Promise.all([
+      listClaims(),
+      sessionUser(req, res),
+      getMldMarketSummary().catch(() => null),
+    ]);
     const s = claimStats(rows);
     return json(res, 200, {
       user: auth?.public || null,
       stats: {
         offices: s.offices,
-        index: s.index,
+        index: marketSummary ? Number(marketSummary.moon_index) : s.index,
         onBoard: s.onBoard,
         views: s.views,
         clickThroughs: s.clickThroughs,
@@ -25,6 +30,10 @@ export async function handlePublicApi(req, res, url) {
       landmarks: LANDMARKS,
       paymentsMode: 'stripe',
     });
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/market-model') {
+    return json(res, 200, { market: MLD_MARKET });
   }
 
   if (req.method === 'GET' && url.pathname === '/api/board') {
