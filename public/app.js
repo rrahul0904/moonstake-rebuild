@@ -206,7 +206,12 @@ async function updateQuote(){
 function renderSelection(){const q=state.quote;$('#sector-count').textContent=`${state.selected.size} position${state.selected.size===1?'':'s'}`;$('#selection-price').textContent=state.selected.size?`${q.total||0}`:'—';$('#claim-btn').textContent=`Register for ${q.total||0}`;$('#claim-btn').disabled=!state.selected.size||!!q.unavailable?.length}
 
 async function bootstrap(){
-  const data=await api('/api/bootstrap');Object.assign(state,{claims:data.claims,landmarks:data.landmarks,user:data.user,stats:data.stats});renderAuthState();updateStats();draw();setTimeout(()=>$('#boot').classList.add('done'),450)
+  const data=await api('/api/bootstrap');Object.assign(state,{claims:data.claims,landmarks:data.landmarks,user:data.user,stats:data.stats});renderAuthState();updateStats();draw();setTimeout(()=>$('#boot').classList.add('done'),450);
+  const lot=String(new URLSearchParams(location.search).get('lot')||'').toUpperCase();
+  if(/^MOON-\d{3}-\d{3}$/.test(lot)){
+    const pos=displayCoords(lot);
+    if(pos){focusSector(pos.x,pos.y,3.2);const claim=sectorClaim(lot);if(claim)positionFlagCard(claim,lot)}
+  }
 }
 
 function renderAuthState(){const btn=$('#signin-btn');if(state.user){btn.textContent=state.user.brand||'Account';btn.title=state.user.email}else{btn.textContent='Sign in';btn.title=''}}
@@ -238,9 +243,9 @@ async function refresh(){const data=await api('/api/bootstrap');state.claims=dat
 
 function positionFlagCard(claim,id){
   state.activeClaim=claim;const first=id||claim.sectors[0];const pos=displayCoords(first);if(!pos)return;const r=sectorRect(pos.x,pos.y);const card=$('#flag-card');
-  const marketButton=/^MOON-\d{3}-\d{3}$/.test(first)?`<button class="ghost-btn" data-offer-lot="${escapeAttr(first)}">Make offer</button>`:'';
+  const marketButton=/^MOON-\d{3}-\d{3}$/.test(first)?`<button class="ghost-btn" data-offer-lot="${escapeAttr(first)}">Make offer</button><button class="ghost-btn" data-share-lot="${escapeAttr(first)}">Share lot</button>`:'';
   card.innerHTML=`<button class="flag-close" aria-label="Close">×</button><h3>${escapeHtml(claim.brand)}</h3><p>${escapeHtml(claim.tagline||'A registry marker on the Moon.')}</p><div class="flag-meta"><span>${claim.sectors.length} position${claim.sectors.length===1?'':'s'}</span><span>${claim.views||0} views · ${claim.clicks||0} clicks</span></div>${claim.url?`<a href="${escapeAttr(claim.url)}" target="_blank" rel="noopener noreferrer">Visit ${escapeHtml(claim.brand)} ↗</a>`:''}${marketButton}`;
-  const left=Math.min(canvas.clientWidth-285,Math.max(12,r.x+14));const top=Math.min(canvas.clientHeight-250,Math.max(92,r.y-36));card.style.left=`${left}px`;card.style.top=`${top}px`;card.classList.remove('hidden');card.querySelector('.flag-close').onclick=()=>card.classList.add('hidden');const link=card.querySelector('a');if(link)link.addEventListener('click',()=>api('/api/events/click',{method:'POST',body:JSON.stringify({claimId:claim.id,lotId:first})}).catch(()=>{}));const offer=card.querySelector('[data-offer-lot]');if(offer)offer.onclick=()=>openOffer(offer.dataset.offerLot);api('/api/events/view',{method:'POST',body:JSON.stringify({claimId:claim.id,lotId:first})}).then(refresh).catch(()=>{});
+  const left=Math.min(canvas.clientWidth-285,Math.max(12,r.x+14));const top=Math.min(canvas.clientHeight-250,Math.max(92,r.y-36));card.style.left=`${left}px`;card.style.top=`${top}px`;card.classList.remove('hidden');card.querySelector('.flag-close').onclick=()=>card.classList.add('hidden');const link=card.querySelector('a');if(link)link.addEventListener('click',()=>api('/api/events/click',{method:'POST',body:JSON.stringify({claimId:claim.id,lotId:first})}).catch(()=>{}));const offer=card.querySelector('[data-offer-lot]');if(offer)offer.onclick=()=>openOffer(offer.dataset.offerLot);const share=card.querySelector('[data-share-lot]');if(share)share.onclick=async()=>{const u=new URL(location.href);u.searchParams.set('lot',share.dataset.shareLot);history.replaceState(null,'',u);try{await navigator.clipboard.writeText(u.href);toast('Canonical lot link copied')}catch{toast(u.href)}};api('/api/events/view',{method:'POST',body:JSON.stringify({claimId:claim.id,lotId:first})}).then(refresh).catch(()=>{});
 }
 
 function escapeHtml(v){return String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
