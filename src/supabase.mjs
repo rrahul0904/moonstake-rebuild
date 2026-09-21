@@ -148,3 +148,9 @@ export async function getMldMarketSummary() {
   const rows = await request('/rest/v1/mld_market_summary?select=*');
   return rows?.[0] || null;
 }
+
+
+export async function listAuthUsers() {
+  const data = await request('/auth/v1/admin/users?page=1&per_page=1000');
+  return Array.isArray(data?.users) ? data.users : [];
+}
