@@ -1,4 +1,4 @@
-import { getAdminClaim, listAdminClaims, listAuthUsers, recordClaimRefund, updateModeration } from './supabase.mjs';
+import { getAdminClaim, getMldMarketSummary, listAdminClaims, listAuthUsers, listMldOffers, listMldTransactions, recordClaimRefund, updateModeration } from './supabase.mjs';
 import { createRefund } from './stripe.mjs';
 import { adminAllowed, json, readBody, sessionUser } from './production-common.mjs';
 
@@ -12,6 +12,18 @@ async function requireAdmin(req, res) {
 }
 
 export async function handleAdminApi(req, res, url) {
+  if (req.method === 'GET' && url.pathname === '/api/admin/marketplace') {
+    const auth = await requireAdmin(req, res);
+    if (!auth) return true;
+    const [summary, offers, transactions] = await Promise.all([
+      getMldMarketSummary().catch(() => null),
+      listMldOffers(),
+      listMldTransactions(),
+    ]);
+    json(res, 200, { summary, offers, transactions });
+    return true;
+  }
+
   if (req.method === 'GET' && url.pathname === '/api/admin/users') {
     const auth = await requireAdmin(req, res);
     if (!auth) return true;
