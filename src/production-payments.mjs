@@ -4,6 +4,8 @@ import {
   listUnavailableSectorIds,
   processCheckoutCompleted,
   processCheckoutExpired,
+  processMldResaleCheckoutCompleted,
+  processMldResaleCheckoutExpired,
   releaseReservation,
   reserveSectors,
 } from './supabase.mjs';
@@ -18,8 +20,29 @@ export async function handlePaymentApi(req, res, url) {
     }
     const event = JSON.parse(raw);
     const object = event?.data?.object || {};
-    const reservationId = object?.metadata?.reservation_id || object?.client_reference_id;
+    const isResale = object?.metadata?.transaction_type === 'resale';
+    const offerId = object?.metadata?.offer_id;
+    const reservationId = object?.metadata?.reservation_id || (!isResale ? object?.client_reference_id : null);
+
     if (
+      isResale &&
+      offerId &&
+      ((event.type === 'checkout.session.completed' && object.payment_status === 'paid') ||
+        event.type === 'checkout.session.async_payment_succeeded')
+    ) {
+      await processMldResaleCheckoutCompleted({
+        eventId:event.id,
+        offerId,
+        sessionId:object.id,
+        paymentIntentId:object.payment_intent,
+      });
+    } else if (
+      isResale &&
+      offerId &&
+      (event.type === 'checkout.session.expired' || event.type === 'checkout.session.async_payment_failed')
+    ) {
+      await processMldResaleCheckoutExpired({ eventId:event.id, offerId, sessionId:object.id });
+    } else if (
       ((event.type === 'checkout.session.completed' && object.payment_status === 'paid') ||
         event.type === 'checkout.session.async_payment_succeeded') &&
       reservationId
