@@ -132,3 +132,8 @@ export async function consumeRateLimit({ bucket, keyHash, limit, windowSeconds }
     p_bucket:bucket, p_key_hash:keyHash, p_limit:limit, p_window_seconds:windowSeconds
   }});
 }
+
+export async function getMldMarketSummary() {
+  const rows = await request('/rest/v1/mld_market_summary?select=*');
+  return rows?.[0] || null;
+}
