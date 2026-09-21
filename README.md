@@ -36,6 +36,7 @@ The paid ownership state machine is reservation → Stripe Checkout → signed w
 - Move / Select modes and 64 × 32 claimable sector grid
 - Server-authoritative pricing and premium sectors
 - Landmark and brand search
+- Semantic browser/agent control contract for search, focus, zoom, sector selection and structured state read-back (purchase actions intentionally excluded)
 - Public brand flags and claim cards
 - Board, Explore, My Land and analytics
 - Local demo auth/data mode for zero-credential development
@@ -52,3 +53,7 @@ The paid ownership state machine is reservation → Stripe Checkout → signed w
 ## What is still external / unverified
 
 The code is present, but a public launch is **not** called complete until a dedicated Supabase project is provisioned, the migration is applied and advisor-clean, Stripe sandbox/live credentials and webhook are connected, a production host/domain is deployed, and real sandbox payment + concurrent-purchase E2E tests pass. See `docs/IMPLEMENTATION_STATUS.md` and `docs/PRODUCTION_ARCHITECTURE.md`.
+
+## Semantic lunar control
+
+The web app now exposes a purchase-safe semantic control surface at `window.moonstakeSemantic`. It is designed as the clean-room donor integration from the Limoni globe concept: automation addresses landmarks, claims and sectors by identity rather than screen coordinates. See `docs/LIMONI_GLOBE_DONOR.md`.
