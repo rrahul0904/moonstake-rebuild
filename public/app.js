@@ -223,6 +223,14 @@ function setAuthMode(mode){state.authMode=mode;const signup=mode==='signup';$('#
 function openAuth(){setAuthMode('signin');showModal('#auth-modal')}
 function openClaim(){if(!state.selected.size)return;if(!state.user){state.pendingClaimAfterAuth=true;openAuth();return}$('#claim-brand').value=state.user.brand||'';$('#claim-tagline').value='';$('#claim-url').value='';$('#claim-summary').textContent=`${state.selected.size} registry position${state.selected.size===1?'':'s'} · demo checkout`;$('#claim-total').textContent=`${state.quote.total}`;showModal('#claim-modal')}
 
+async function watchLot(lotId,action='add'){
+  if(!state.user){openAuth();toast('Sign in to manage your watchlist');return}
+  try{
+    await api('/api/watchlist',{method:'POST',body:JSON.stringify({lotId,action})});
+    toast(action==='remove'?'Removed from watchlist':'Added to watchlist');
+  }catch(err){toast(err.message)}
+}
+
 async function openOffer(lotId){
   if(!state.user){state.pendingOfferLot=lotId;openAuth();return}
   try{
@@ -243,9 +251,9 @@ async function refresh(){const data=await api('/api/bootstrap');state.claims=dat
 
 function positionFlagCard(claim,id){
   state.activeClaim=claim;const first=id||claim.sectors[0];const pos=displayCoords(first);if(!pos)return;const r=sectorRect(pos.x,pos.y);const card=$('#flag-card');
-  const marketButton=/^MOON-\d{3}-\d{3}$/.test(first)?`<button class="ghost-btn" data-offer-lot="${escapeAttr(first)}">Make offer</button><button class="ghost-btn" data-share-lot="${escapeAttr(first)}">Share lot</button>`:'';
+  const marketButton=/^MOON-\d{3}-\d{3}$/.test(first)?`<button class="ghost-btn" data-offer-lot="${escapeAttr(first)}">Make offer</button><button class="ghost-btn" data-watch-lot="${escapeAttr(first)}">Watch</button><button class="ghost-btn" data-share-lot="${escapeAttr(first)}">Share lot</button>`:'';
   card.innerHTML=`<button class="flag-close" aria-label="Close">×</button><h3>${escapeHtml(claim.brand)}</h3><p>${escapeHtml(claim.tagline||'A registry marker on the Moon.')}</p><div class="flag-meta"><span>${claim.sectors.length} position${claim.sectors.length===1?'':'s'}</span><span>${claim.views||0} views · ${claim.clicks||0} clicks</span></div>${claim.url?`<a href="${escapeAttr(claim.url)}" target="_blank" rel="noopener noreferrer">Visit ${escapeHtml(claim.brand)} ↗</a>`:''}${marketButton}`;
-  const left=Math.min(canvas.clientWidth-285,Math.max(12,r.x+14));const top=Math.min(canvas.clientHeight-250,Math.max(92,r.y-36));card.style.left=`${left}px`;card.style.top=`${top}px`;card.classList.remove('hidden');card.querySelector('.flag-close').onclick=()=>card.classList.add('hidden');const link=card.querySelector('a');if(link)link.addEventListener('click',()=>api('/api/events/click',{method:'POST',body:JSON.stringify({claimId:claim.id,lotId:first})}).catch(()=>{}));const offer=card.querySelector('[data-offer-lot]');if(offer)offer.onclick=()=>openOffer(offer.dataset.offerLot);const share=card.querySelector('[data-share-lot]');if(share)share.onclick=async()=>{const u=new URL(location.href);u.searchParams.set('lot',share.dataset.shareLot);history.replaceState(null,'',u);try{await navigator.clipboard.writeText(u.href);toast('Canonical lot link copied')}catch{toast(u.href)}};api('/api/events/view',{method:'POST',body:JSON.stringify({claimId:claim.id,lotId:first})}).then(refresh).catch(()=>{});
+  const left=Math.min(canvas.clientWidth-285,Math.max(12,r.x+14));const top=Math.min(canvas.clientHeight-250,Math.max(92,r.y-36));card.style.left=`${left}px`;card.style.top=`${top}px`;card.classList.remove('hidden');card.querySelector('.flag-close').onclick=()=>card.classList.add('hidden');const link=card.querySelector('a');if(link)link.addEventListener('click',()=>api('/api/events/click',{method:'POST',body:JSON.stringify({claimId:claim.id,lotId:first})}).catch(()=>{}));const offer=card.querySelector('[data-offer-lot]');if(offer)offer.onclick=()=>openOffer(offer.dataset.offerLot);const watch=card.querySelector('[data-watch-lot]');if(watch)watch.onclick=()=>watchLot(watch.dataset.watchLot);const share=card.querySelector('[data-share-lot]');if(share)share.onclick=async()=>{const u=new URL(location.href);u.searchParams.set('lot',share.dataset.shareLot);history.replaceState(null,'',u);try{await navigator.clipboard.writeText(u.href);toast('Canonical lot link copied')}catch{toast(u.href)}};api('/api/events/view',{method:'POST',body:JSON.stringify({claimId:claim.id,lotId:first})}).then(refresh).catch(()=>{});
 }
 
 function escapeHtml(v){return String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
@@ -273,9 +281,191 @@ async function showPanel(tab){
   const panel=$('#side-panel');panel.classList.remove('hidden');$$('.tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));
   if(tab==='board'){
     $('#panel-kicker').textContent='THE BOARD';$('#panel-title').textContent='Brands & Moon Index';
-    const [data,indexData]=await Promise.all([api('/api/board'),api('/api/index-history?limit=120').catch(()=>({points:[]}))]);
+    const [data,indexData,activityData]=await Promise.all([api('/api/board'),api('/api/index-history?limit=120').catch(()=>({points:[]})),api('/api/activity?limit=12').catch(()=>({activity:[]}))]);
     const boardRows=data.board.length?data.board.map((row,i)=>`<div class="board-row" data-claim="${row.id}"><span class="rank">${String(i+1).padStart(2,'0')}</span><div class="row-copy"><strong>${escapeHtml(row.brand)}</strong><small>${escapeHtml(row.tagline||'No tagline yet')}</small></div><div class="row-metrics">${row.views} <small>views · ${row.clicks} clicks</small></div></div>`).join(''):'<div class="panel-empty">No brands are on the board yet.</div>';
-    $('#panel-content').innerHTML=indexSparkline(indexData.points||[])+`<div class="panel-section">${boardRows}</div>`;
+    const activity=(activityData.activity||[]).map(x=>`<div class="land-row"><span class="rank">${x.kind==='resale'?'↻':'+'}</span><div class="row-copy"><strong>${escapeHtml(x.lot_id)}</strong><small>${String(x.kind).replace('_',' ')} · ${new Date(x.created_at).toLocaleString()}</small></div><div class="row-metrics">${(Number(x.gross_cents)/100).toFixed(2)}<small>${x.kind==='resale'?' · gain 
+    $('[data-claim]').forEach(el=>el.onclick=()=>{const c=state.claims.find(x=>x.id===el.dataset.claim);if(c){const pos=displayCoords(c.sectors[0]);if(pos){focusSector(pos.x,pos.y);positionFlagCard(c);}}});
+  }
+  if(tab==='explore'){ $('#panel-kicker').textContent='EXPLORE';$('#panel-title').textContent='Landmarks & flags';const data=await api('/api/explore');$('#panel-content').innerHTML=`<div class="panel-section">${data.landmarks.map(l=>`<div class="land-row" data-landmark="${l.id}"><span class="rank">◎</span><div class="row-copy"><strong>${escapeHtml(l.name)}</strong><small>${escapeHtml(l.subtitle)}</small></div><div class="row-metrics">${l.lat.toFixed(1)}°<small>${l.lon.toFixed(1)}°</small></div></div>`).join('')}</div>`;$$('[data-landmark]').forEach(el=>el.onclick=()=>{const l=state.landmarks.find(x=>x.id===el.dataset.landmark);if(l){focusSector(l.lotX??l.x,l.lotY??l.y,3.2);panel.classList.add('hidden');setTabActive('plot')}})}
+  if(tab==='worlds'){
+    $('#panel-kicker').textContent='ATLAS 259';
+    $('#panel-title').textContent='Registry of worlds';
+    try{
+      const data=await api('/api/celestial-bodies');
+      const rows=data.bodies.map(body=>{
+        const live=body.enabled;
+        const mode=body.inventoryMode==='surface-lots'?'surface registry':'observation registry';
+        const lots=body.totalLots?Number(body.totalLots).toLocaleString()+' positions':mode;
+        return `<div class="land-row"><span class="rank">${live?'●':'○'}</span><div class="row-copy"><strong>${escapeHtml(body.name)}${live?' · LIVE':''}</strong><small>Phase ${body.phase} · ${escapeHtml(mode)}</small></div><div class="row-metrics">${escapeHtml(lots)}<small>${live?'open now':'locked'}</small></div></div>`;
+      }).join('');
+      $('#panel-content').innerHTML=`<div class="panel-section">${rows}</div><div class="panel-empty">The Moon stays the first live market. New worlds unlock in phases so Atlas 259 does not dilute attention or scarcity by opening the whole Solar System at once.</div>`;
+    }catch(e){
+      $('#panel-content').innerHTML=`<div class="panel-empty">${escapeHtml(e.message)}</div>`;
+    }
+  }
+  if(tab==='offers'){
+    $('#panel-kicker').textContent='SECONDARY MARKET';
+    $('#panel-title').textContent='Your offers';
+    if(!state.user){
+      $('#panel-content').innerHTML='<div class="panel-empty">Sign in to see offers you sent and received.<div class="panel-cta"><button id="offers-signin" class="claim-btn">Sign in</button></div></div>';
+      $('#offers-signin').onclick=openAuth;
+      return;
+    }
+    try{
+      const data=await api('/api/offers/mine');
+      const payout=data.payout||{};
+      const payoutText=payout.resale_payout_ready?'Seller payouts ready':`Seller payouts: ${payout.onboarding_status||'not started'}`;
+      const received=(data.received||[]).map(o=>{
+        const action=o.status==='pending'
+          ? `<button class="ghost-btn" data-accept-offer="${o.id}" ${payout.resale_payout_ready?'':'disabled'}>Accept</button>`
+          : '';
+        return `<div class="mine-row"><span class="rank">↓</span><div class="row-copy"><strong>${escapeHtml(o.lot_id)} · ${(Number(o.amount_cents)/100).toFixed(2)}</strong><small>Received · ${escapeHtml(o.status)}${o.payment_due_at?' · pay by '+new Date(o.payment_due_at).toLocaleString():''}</small></div><div class="row-metrics">${action}</div></div>`;
+      }).join('');
+      const watched=(data.watchlist||[]).map(w=>`<div class="mine-row"><span class="rank">☆</span><div class="row-copy"><strong>${escapeHtml(w.lot_id)} · ${(Number(w.last_paid_cents)/100).toFixed(2)}</strong><small>${Number(w.views||0)} views · ${Number(w.clicks||0)} clicks</small></div><div class="row-metrics"><button class="ghost-btn" data-unwatch-lot="${escapeAttr(w.lot_id)}">Remove</button></div></div>`).join('');
+      const sent=(data.sent||[]).map(o=>{
+        let action='';
+        if(o.status==='pending')action=`<button class="ghost-btn" data-withdraw-offer="${o.id}">Withdraw</button>`;
+        if(o.status==='accepted_pending_payment')action=`<button class="claim-btn" data-pay-offer="${o.id}">Pay</button>`;
+        return `<div class="mine-row"><span class="rank">↑</span><div class="row-copy"><strong>${escapeHtml(o.lot_id)} · ${(Number(o.amount_cents)/100).toFixed(2)}</strong><small>Sent · ${escapeHtml(o.status)}${o.payment_due_at?' · pay by '+new Date(o.payment_due_at).toLocaleString():''}</small></div><div class="row-metrics">${action}</div></div>`;
+      }).join('');
+      $('#panel-content').innerHTML=`<div class="panel-empty">${escapeHtml(payoutText)}${payout.resale_payout_ready?'':' · payout onboarding must be enabled before you can accept cash resale offers.'}</div><div class="panel-section"><strong>Received</strong>${received||'<div class="panel-empty">No received offers.</div>'}</div><div class="panel-section"><strong>Sent</strong>${sent||'<div class="panel-empty">No sent offers.</div>'}</div><div class="panel-section"><strong>Watchlist</strong>${watched||'<div class="panel-empty">No watched positions.</div>'}</div>`;
+      $('[data-withdraw-offer]').forEach(btn=>btn.onclick=async()=>{try{await api(`/api/offers/${btn.dataset.withdrawOffer}/withdraw`,{method:'POST'});toast('Offer withdrawn');showPanel('offers')}catch(e){toast(e.message)}});
+      $('[data-accept-offer]').forEach(btn=>btn.onclick=async()=>{try{await api(`/api/offers/${btn.dataset.acceptOffer}/accept`,{method:'POST'});toast('Offer accepted · waiting for buyer payment');showPanel('offers')}catch(e){toast(e.message)}});
+      $('[data-pay-offer]').forEach(btn=>btn.onclick=async()=>{try{const out=await api(`/api/offers/${btn.dataset.payOffer}/checkout`,{method:'POST'});location.href=out.payment.url}catch(e){toast(e.message)}});
+    }catch(e){$('#panel-content').innerHTML=`<div class="panel-empty">${escapeHtml(e.message)}</div>`}
+  }
+  if(tab==='land'){ $('#panel-kicker').textContent='MY LAND';$('#panel-title').textContent=state.user?state.user.brand:'Your place on the Moon';if(!state.user){$('#panel-content').innerHTML='<div class="panel-empty">Sign in to see every registry position you hold, plus views and click-throughs.<div class="panel-cta"><button id="panel-signin" class="claim-btn">Sign in</button></div></div>';$('#panel-signin').onclick=openAuth;return}try{const data=await api('/api/my-land');$('#panel-content').innerHTML=data.claims.length?data.claims.map(c=>`<div class="mine-row" data-mine="${c.id}"><span class="rank">⚑</span><div class="row-copy"><strong>${escapeHtml(c.brand)}</strong><small>${c.sectors.length} positions · $${c.amount} claimed</small></div><div class="row-metrics">${c.views||0}<small>views · ${c.clicks||0} clicks</small></div></div>`).join(''):'<div class="panel-empty">You have not registered a position yet. Close this panel, select a position, and place your first marker.</div>';$$('[data-mine]').forEach(el=>el.onclick=()=>{const c=state.claims.find(x=>x.id===el.dataset.mine);if(c){const [,x,y]=c.sectors[0].split('-');focusSector(+x,+y);positionFlagCard(c)}})}catch(e){$('#panel-content').innerHTML=`<div class="panel-empty">${escapeHtml(e.message)}</div>`}}
+}
+function setTabActive(tab){$$('.tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab))}
+
+canvas.addEventListener('pointerdown',e=>{canvas.setPointerCapture(e.pointerId);state.dragging=true;state.dragStart={x:e.clientX,y:e.clientY,panX:state.panX,panY:state.panY};canvas.classList.add('dragging')});
+canvas.addEventListener('pointermove',e=>{const sector=screenToSector(e.clientX,e.clientY);state.hoveredSector=sector;if(sector){const claim=sectorClaim(sector.id);$('#tooltip').textContent=claim?`${sector.id} · ${claim.brand}`:`${sector.id} · available`;$('#tooltip').style.left=`${e.clientX+12}px`;$('#tooltip').style.top=`${e.clientY+12}px`;$('#tooltip').classList.remove('hidden')}else $('#tooltip').classList.add('hidden');if(state.dragging&&state.mode==='move'){state.panX=state.dragStart.panX+(e.clientX-state.dragStart.x);state.panY=state.dragStart.panY+(e.clientY-state.dragStart.y);clampPan()}draw()});
+canvas.addEventListener('pointerup',async e=>{const moved=Math.hypot(e.clientX-state.dragStart.x,e.clientY-state.dragStart.y);state.dragging=false;canvas.classList.remove('dragging');if(moved>5)return;const sector=screenToSector(e.clientX,e.clientY);if(!sector)return;if(state.mode==='move'){const claim=sectorClaim(sector.id);if(claim)positionFlagCard(claim,sector.id);else zoomAt(1.45,e.clientX,e.clientY)}else{const claim=sectorClaim(sector.id);if(claim){positionFlagCard(claim,sector.id);toast('That registry position is already held');return}if(state.selected.has(sector.id))state.selected.delete(sector.id);else state.selected.add(sector.id);draw();await updateQuote()}});
+canvas.addEventListener('pointerleave',()=>{$('#tooltip').classList.add('hidden');state.hoveredSector=null;draw()});
+canvas.addEventListener('wheel',e=>{e.preventDefault();zoomAt(e.deltaY<0?1.13:.885,e.clientX,e.clientY)},{passive:false});
+
+$('#mode-move').onclick=()=>setMode('move');$('#mode-select').onclick=()=>setMode('select');$('#zoom-in').onclick=()=>zoomAt(1.28);$('#zoom-out').onclick=()=>zoomAt(.78);$('#whole-moon').onclick=()=>{state.zoom=1;state.panX=0;state.panY=0;draw()};$('#buy-lots').onclick=()=>{setMode('select');if(state.zoom<1.45)zoomAt(1.6)};$('#clear-selection').onclick=()=>{state.selected.clear();state.quote={count:0,total:0,unavailable:[]};renderSelection();draw()};$('#claim-btn').onclick=openClaim;$('#how-btn').onclick=()=>showModal('#how-modal');$('#signin-btn').onclick=async()=>{if(!state.user)return openAuth();const panel=$('#side-panel');if(panel.classList.contains('hidden'))showPanel('land');else{await api('/api/auth/signout',{method:'POST'});await refresh();toast('Signed out')}};$('#modal-backdrop').onclick=closeModals;$$('[data-close-modal]').forEach(b=>b.onclick=closeModals);$('#auth-signin-tab').onclick=()=>setAuthMode('signin');$('#auth-signup-tab').onclick=()=>setAuthMode('signup');$('#panel-close').onclick=()=>{$('#side-panel').classList.add('hidden');setTabActive('plot')};$$('.tab').forEach(b=>b.onclick=()=>{if(b.dataset.tab==='plot'){$('#side-panel').classList.add('hidden');setTabActive('plot')}else showPanel(b.dataset.tab)});
+
+$('#auth-form').addEventListener('submit',async e=>{e.preventDefault();const error=$('#auth-error');error.classList.add('hidden');const body={email:$('#auth-email').value,password:$('#auth-password').value,brand:$('#auth-brand').value};try{const data=await api(state.authMode==='signup'?'/api/auth/signup':'/api/auth/signin',{method:'POST',body:JSON.stringify(body)});state.user=data.user;renderAuthState();closeModals();toast(`Welcome ${state.user.brand}`);if(state.pendingClaimAfterAuth){state.pendingClaimAfterAuth=false;setTimeout(openClaim,150)}else if(state.pendingOfferLot){const lot=state.pendingOfferLot;state.pendingOfferLot=null;setTimeout(()=>openOffer(lot),150)}}catch(err){error.textContent=err.message;error.classList.remove('hidden')}});
+
+$('#offer-form').addEventListener('submit',async e=>{
+  e.preventDefault();
+  const error=$('#offer-error');error.classList.add('hidden');
+  const lotId=$('#offer-lot-id').value;
+  const amountCents=Math.round(Number($('#offer-amount').value)*100);
+  try{
+    await api('/api/offers',{method:'POST',body:JSON.stringify({lotId,amountCents})});
+    closeModals();
+    toast('Offer placed · no charge until accepted and you choose to pay');
+    showPanel('offers');
+  }catch(err){error.textContent=err.message;error.classList.remove('hidden')}
+});
+
+$('#claim-form').addEventListener('submit',async e=>{e.preventDefault();const error=$('#claim-error');error.classList.add('hidden');try{const data=await api('/api/claims',{method:'POST',body:JSON.stringify({brand:$('#claim-brand').value,tagline:$('#claim-tagline').value,url:$('#claim-url').value,sectors:[...state.selected]})});closeModals();state.selected.clear();state.quote={count:0,total:0,unavailable:[]};renderSelection();await refresh();const claim=state.claims.find(c=>c.id===data.claim.id)||data.claim;positionFlagCard(claim);toast('Registry position added on the Moon')}catch(err){error.textContent=err.message;error.classList.remove('hidden')}});
+
+const search=$('#search');search.addEventListener('input',()=>{const q=search.value.trim().toLowerCase();const box=$('#search-results');if(!q){box.classList.add('hidden');return}const landmarks=state.landmarks.filter(l=>`${l.name} ${l.subtitle}`.toLowerCase().includes(q)).slice(0,5);const brands=state.claims.filter(c=>`${c.brand} ${c.tagline}`.toLowerCase().includes(q)).slice(0,5);const rows=[...landmarks.map(l=>({kind:'landmark',id:l.id,title:l.name,sub:l.subtitle})),...brands.map(c=>({kind:'claim',id:c.id,title:c.brand,sub:c.tagline||'Brand flag'}))];box.innerHTML=rows.length?rows.map(r=>`<button class="search-result" data-kind="${r.kind}" data-id="${r.id}"><span>${escapeHtml(r.title)}</span><small>${escapeHtml(r.sub)}</small></button>`).join(''):'<button class="search-result" disabled><span>No results</span><small>Try Tycho or Apollo 11</small></button>';box.classList.remove('hidden');$$('.search-result[data-id]').forEach(btn=>btn.onclick=()=>{box.classList.add('hidden');search.value=btn.querySelector('span').textContent;if(btn.dataset.kind==='landmark'){const l=state.landmarks.find(x=>x.id===btn.dataset.id);focusSector(l.lotX??l.x,l.lotY??l.y,3.3)}else{const c=state.claims.find(x=>x.id===btn.dataset.id);const pos=displayCoords(c.sectors[0]);if(pos){focusSector(pos.x,pos.y,3);positionFlagCard(c)}}})});document.addEventListener('click',e=>{if(!e.target.closest('.search-wrap'))$('#search-results').classList.add('hidden')});
+
+function semanticSnapshot(){
+  return buildSemanticSnapshot({
+    zoom: state.zoom,
+    panX: state.panX,
+    panY: state.panY,
+    mode: state.mode,
+    selected: state.selected,
+    quote: state.quote,
+    stats: state.stats,
+    activeClaim: state.activeClaim,
+    user: state.user
+  });
+}
+
+function semanticSearch(query){
+  return searchSemanticEntities(query,{landmarks:state.landmarks,claims:state.claims});
+}
+
+function semanticFocus(target){
+  const value=String(target||'').trim();
+  if(!value)throw new Error('Provide a landmark, brand, claim id, or registry position id');
+  if(/^(?:MOON-\d{3}-\d{3}|S-\d{2}-\d{2})$/i.test(value)){
+    const sector=parseSectorId(value,GRID);
+    focusSector(sector.x,sector.y,Math.max(state.zoom,2.6));
+    return semanticSnapshot();
+  }
+  const normalized=value.toLowerCase();
+  const directClaim=state.claims.find(c=>c.id===value);
+  const match=directClaim
+    ? {kind:'claim',id:directClaim.id}
+    : semanticSearch(value).find(item=>String(item.title||'').toLowerCase()===normalized)||semanticSearch(value)[0];
+  if(!match)throw new Error(`No Atlas 259 result found for "${value}"`);
+  if(match.kind==='landmark'){
+    const landmark=state.landmarks.find(item=>item.id===match.id);
+    focusSector(landmark.lotX??landmark.x,landmark.lotY??landmark.y,3.3);
+  }else{
+    const claim=state.claims.find(item=>item.id===match.id);
+    if(!claim)throw new Error('Claim is no longer available');
+    const pos=displayCoords(claim.sectors[0]);if(!pos)throw new Error('Claim position is invalid');
+    focusSector(pos.x,pos.y,3);
+    positionFlagCard(claim);
+  }
+  return semanticSnapshot();
+}
+
+function semanticZoomTo(value){
+  state.zoom=clampSemanticZoom(value);
+  clampPan();
+  draw();
+  return semanticSnapshot();
+}
+
+async function semanticSelectSector(id,{append=true}={}){
+  const sector=parseSectorId(id,GRID);
+  const claim=sectorClaim(sector.id);
+  if(claim)throw new Error(`${sector.id} is already claimed by ${claim.brand}`);
+  setMode('select');
+  if(!append)state.selected.clear();
+  state.selected.add(sector.id);
+  focusSector(sector.x,sector.y,Math.max(state.zoom,2.6));
+  draw();
+  await updateQuote();
+  return semanticSnapshot();
+}
+
+function semanticClearSelection(){
+  state.selected.clear();
+  state.quote={count:0,total:0,unavailable:[]};
+  renderSelection();
+  draw();
+  return semanticSnapshot();
+}
+
+function semanticResetView(){
+  state.zoom=1;
+  state.panX=0;
+  state.panY=0;
+  setMode('move');
+  draw();
+  return semanticSnapshot();
+}
+
+const semanticApi=Object.freeze({
+  version:SEMANTIC_API_VERSION,
+  snapshot:semanticSnapshot,
+  search:semanticSearch,
+  focus:semanticFocus,
+  zoomTo:semanticZoomTo,
+  selectSector:semanticSelectSector,
+  clearSelection:semanticClearSelection,
+  resetView:semanticResetView
+});
+window.atlas259Semantic=semanticApi;
+window.moonstakeSemantic=semanticApi; // temporary backwards-compatible donor alias
+
+document.dispatchEvent(new CustomEvent('atlas259:semantic-ready',{detail:{version:SEMANTIC_API_VERSION}}));
+document.dispatchEvent(new CustomEvent('moonstake:semantic-ready',{detail:{version:SEMANTIC_API_VERSION,deprecated:true}}));
+
+buildMoonTexture();addEventListener('resize',resize);resize();renderSelection();bootstrap().catch(err=>{console.error(err);$('#boot').innerHTML=`<strong>ATLAS 259</strong><span>Could not open the Moon registry.</span><button class="ghost-btn" onclick="location.reload()">Try again</button>`});
++(Number(x.gain_cents)/100).toFixed(2):''}</small></div></div>`).join('');
+    $('#panel-content').innerHTML=indexSparkline(indexData.points||[])+`<div class="panel-section">${boardRows}</div><div class="panel-section"><strong>Recent market activity</strong>${activity||'<div class="panel-empty">No paid market activity yet.</div>'}</div>`;
     $('[data-claim]').forEach(el=>el.onclick=()=>{const c=state.claims.find(x=>x.id===el.dataset.claim);if(c){const pos=displayCoords(c.sectors[0]);if(pos){focusSector(pos.x,pos.y);positionFlagCard(c);}}});
   }
   if(tab==='explore'){ $('#panel-kicker').textContent='EXPLORE';$('#panel-title').textContent='Landmarks & flags';const data=await api('/api/explore');$('#panel-content').innerHTML=`<div class="panel-section">${data.landmarks.map(l=>`<div class="land-row" data-landmark="${l.id}"><span class="rank">◎</span><div class="row-copy"><strong>${escapeHtml(l.name)}</strong><small>${escapeHtml(l.subtitle)}</small></div><div class="row-metrics">${l.lat.toFixed(1)}°<small>${l.lon.toFixed(1)}°</small></div></div>`).join('')}</div>`;$$('[data-landmark]').forEach(el=>el.onclick=()=>{const l=state.landmarks.find(x=>x.id===el.dataset.landmark);if(l){focusSector(l.lotX??l.x,l.lotY??l.y,3.2);panel.classList.add('hidden');setTabActive('plot')}})}
