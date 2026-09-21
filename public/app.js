@@ -193,7 +193,7 @@ function showModal(id){$('#modal-backdrop').classList.remove('hidden');$(id).cla
 function closeModals(){$('#modal-backdrop').classList.add('hidden');$$('.modal').forEach(m=>m.classList.add('hidden'));$('#auth-error').classList.add('hidden');$('#claim-error').classList.add('hidden')}
 function toast(message){const t=$('#toast');t.textContent=message;t.classList.remove('hidden');clearTimeout(toast.timer);toast.timer=setTimeout(()=>t.classList.add('hidden'),2600)}
 
-function setAuthMode(mode){state.authMode=mode;const signup=mode==='signup';$('#auth-signin-tab').classList.toggle('active',!signup);$('#auth-signup-tab').classList.toggle('active',signup);$('#brand-field').classList.toggle('hidden',!signup);$('#auth-title').textContent=signup?'Create your Moonstake account':'Sign in to claim land';$('#auth-password').autocomplete=signup?'new-password':'current-password'}
+function setAuthMode(mode){state.authMode=mode;const signup=mode==='signup';$('#auth-signin-tab').classList.toggle('active',!signup);$('#auth-signup-tab').classList.toggle('active',signup);$('#brand-field').classList.toggle('hidden',!signup);$('#auth-title').textContent=signup?'Create your Atlas 259 account':'Sign in to register a position';$('#auth-password').autocomplete=signup?'new-password':'current-password'}
 function openAuth(){setAuthMode('signin');showModal('#auth-modal')}
 function openClaim(){if(!state.selected.size)return;if(!state.user){state.pendingClaimAfterAuth=true;openAuth();return}$('#claim-brand').value=state.user.brand||'';$('#claim-tagline').value='';$('#claim-url').value='';$('#claim-summary').textContent=`${state.selected.size} sector${state.selected.size===1?'':'s'} · demo checkout`;$('#claim-total').textContent=`$${state.quote.total}`;showModal('#claim-modal')}
 
@@ -201,7 +201,7 @@ async function refresh(){const data=await api('/api/bootstrap');state.claims=dat
 
 function positionFlagCard(claim,id){
   state.activeClaim=claim;const first=id||claim.sectors[0];const [,sx,sy]=first.split('-');const r=sectorRect(+sx,+sy);const card=$('#flag-card');
-  card.innerHTML=`<button class="flag-close" aria-label="Close">×</button><h3>${escapeHtml(claim.brand)}</h3><p>${escapeHtml(claim.tagline||'A startup flag on the Moon.')}</p><div class="flag-meta"><span>${claim.sectors.length} sector${claim.sectors.length===1?'':'s'}</span><span>${claim.views||0} views · ${claim.clicks||0} clicks</span></div>${claim.url?`<a href="${escapeAttr(claim.url)}" target="_blank" rel="noopener noreferrer">Visit ${escapeHtml(claim.brand)} ↗</a>`:''}`;
+  card.innerHTML=`<button class="flag-close" aria-label="Close">×</button><h3>${escapeHtml(claim.brand)}</h3><p>${escapeHtml(claim.tagline||'A registry marker on the Moon.')}</p><div class="flag-meta"><span>${claim.sectors.length} sector${claim.sectors.length===1?'':'s'}</span><span>${claim.views||0} views · ${claim.clicks||0} clicks</span></div>${claim.url?`<a href="${escapeAttr(claim.url)}" target="_blank" rel="noopener noreferrer">Visit ${escapeHtml(claim.brand)} ↗</a>`:''}`;
   const left=Math.min(canvas.clientWidth-285,Math.max(12,r.x+14));const top=Math.min(canvas.clientHeight-250,Math.max(92,r.y-36));card.style.left=`${left}px`;card.style.top=`${top}px`;card.classList.remove('hidden');card.querySelector('.flag-close').onclick=()=>card.classList.add('hidden');const link=card.querySelector('a');if(link)link.addEventListener('click',()=>api('/api/events/click',{method:'POST',body:JSON.stringify({claimId:claim.id})}).catch(()=>{}));api('/api/events/view',{method:'POST',body:JSON.stringify({claimId:claim.id})}).then(refresh).catch(()=>{});
 }
 
@@ -230,7 +230,7 @@ $('#mode-move').onclick=()=>setMode('move');$('#mode-select').onclick=()=>setMod
 
 $('#auth-form').addEventListener('submit',async e=>{e.preventDefault();const error=$('#auth-error');error.classList.add('hidden');const body={email:$('#auth-email').value,password:$('#auth-password').value,brand:$('#auth-brand').value};try{const data=await api(state.authMode==='signup'?'/api/auth/signup':'/api/auth/signin',{method:'POST',body:JSON.stringify(body)});state.user=data.user;renderAuthState();closeModals();toast(`Welcome ${state.user.brand}`);if(state.pendingClaimAfterAuth){state.pendingClaimAfterAuth=false;setTimeout(openClaim,150)}}catch(err){error.textContent=err.message;error.classList.remove('hidden')}});
 
-$('#claim-form').addEventListener('submit',async e=>{e.preventDefault();const error=$('#claim-error');error.classList.add('hidden');try{const data=await api('/api/claims',{method:'POST',body:JSON.stringify({brand:$('#claim-brand').value,tagline:$('#claim-tagline').value,url:$('#claim-url').value,sectors:[...state.selected]})});closeModals();state.selected.clear();state.quote={count:0,total:0,unavailable:[]};renderSelection();await refresh();const claim=state.claims.find(c=>c.id===data.claim.id)||data.claim;positionFlagCard(claim);toast('Flag planted on the Moon')}catch(err){error.textContent=err.message;error.classList.remove('hidden')}});
+$('#claim-form').addEventListener('submit',async e=>{e.preventDefault();const error=$('#claim-error');error.classList.add('hidden');try{const data=await api('/api/claims',{method:'POST',body:JSON.stringify({brand:$('#claim-brand').value,tagline:$('#claim-tagline').value,url:$('#claim-url').value,sectors:[...state.selected]})});closeModals();state.selected.clear();state.quote={count:0,total:0,unavailable:[]};renderSelection();await refresh();const claim=state.claims.find(c=>c.id===data.claim.id)||data.claim;positionFlagCard(claim);toast('Registry position added on the Moon')}catch(err){error.textContent=err.message;error.classList.remove('hidden')}});
 
 const search=$('#search');search.addEventListener('input',()=>{const q=search.value.trim().toLowerCase();const box=$('#search-results');if(!q){box.classList.add('hidden');return}const landmarks=state.landmarks.filter(l=>`${l.name} ${l.subtitle}`.toLowerCase().includes(q)).slice(0,5);const brands=state.claims.filter(c=>`${c.brand} ${c.tagline}`.toLowerCase().includes(q)).slice(0,5);const rows=[...landmarks.map(l=>({kind:'landmark',id:l.id,title:l.name,sub:l.subtitle})),...brands.map(c=>({kind:'claim',id:c.id,title:c.brand,sub:c.tagline||'Brand flag'}))];box.innerHTML=rows.length?rows.map(r=>`<button class="search-result" data-kind="${r.kind}" data-id="${r.id}"><span>${escapeHtml(r.title)}</span><small>${escapeHtml(r.sub)}</small></button>`).join(''):'<button class="search-result" disabled><span>No results</span><small>Try Tycho or Apollo 11</small></button>';box.classList.remove('hidden');$$('.search-result[data-id]').forEach(btn=>btn.onclick=()=>{box.classList.add('hidden');search.value=btn.querySelector('span').textContent;if(btn.dataset.kind==='landmark'){const l=state.landmarks.find(x=>x.id===btn.dataset.id);focusSector(l.x,l.y,3.3)}else{const c=state.claims.find(x=>x.id===btn.dataset.id);const [,x,y]=c.sectors[0].split('-');focusSector(+x,+y,3);positionFlagCard(c)}})});document.addEventListener('click',e=>{if(!e.target.closest('.search-wrap'))$('#search-results').classList.add('hidden')});
 
@@ -316,7 +316,7 @@ function semanticResetView(){
   return semanticSnapshot();
 }
 
-window.moonstakeSemantic=Object.freeze({
+const semanticApi=Object.freeze({
   version:SEMANTIC_API_VERSION,
   snapshot:semanticSnapshot,
   search:semanticSearch,
@@ -326,6 +326,10 @@ window.moonstakeSemantic=Object.freeze({
   clearSelection:semanticClearSelection,
   resetView:semanticResetView
 });
-document.dispatchEvent(new CustomEvent('moonstake:semantic-ready',{detail:{version:SEMANTIC_API_VERSION}}));
+window.atlas259Semantic=semanticApi;
+window.moonstakeSemantic=semanticApi; // temporary backwards-compatible donor alias
 
-buildMoonTexture();addEventListener('resize',resize);resize();renderSelection();bootstrap().catch(err=>{console.error(err);$('#boot').innerHTML=`<strong>MOONSTAKE</strong><span>Could not light the far side.</span><button class="ghost-btn" onclick="location.reload()">Try again</button>`});
+document.dispatchEvent(new CustomEvent('atlas259:semantic-ready',{detail:{version:SEMANTIC_API_VERSION}}));
+document.dispatchEvent(new CustomEvent('moonstake:semantic-ready',{detail:{version:SEMANTIC_API_VERSION,deprecated:true}}));
+
+buildMoonTexture();addEventListener('resize',resize);resize();renderSelection();bootstrap().catch(err=>{console.error(err);$('#boot').innerHTML=`<strong>ATLAS 259</strong><span>Could not open the Moon registry.</span><button class="ghost-btn" onclick="location.reload()">Try again</button>`});
