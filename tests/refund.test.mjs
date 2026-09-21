@@ -17,7 +17,7 @@ test('Stripe refund uses payment intent and stable idempotency key', async () =>
     assert.equal(captured.body.payment_intent,'pi_123');
     assert.equal(captured.body.reason,'requested_by_customer');
     assert.equal(captured.body['metadata[claim_id]'],'claim-123');
-    assert.equal(captured.options.headers['idempotency-key'],'moonstake-refund-claim-123');
+    assert.equal(captured.options.headers['idempotency-key'],'atlas259-refund-claim-123');
   } finally { globalThis.fetch=original; }
 });
 
