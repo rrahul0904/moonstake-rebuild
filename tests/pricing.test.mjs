@@ -4,7 +4,7 @@ import { sectorId, lotId, parseSectorId, parseLotId, sectorPrice, registryPrice,
 
 test('sector ids round-trip', () => {
   assert.equal(sectorId(3, 7), 'S-03-07');
-  assert.deepEqual(parseSectorId('S-03-07'), { x:3, y:7 });
+  assert.deepEqual(parseSectorId('S-03-07'), { id:'S-03-07', kind:'legacy-sector', x:3, y:7 });
 });
 
 test('standard lots start at one dollar', () => {
