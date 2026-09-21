@@ -5,6 +5,7 @@ import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { readDb, mutateDb } from './store.mjs';
 import { LANDMARKS, quoteSectors } from './pricing.mjs';
+import { launchPlan } from './celestial-market.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const publicDir = path.resolve(here, '../public');
@@ -153,6 +154,15 @@ function clearSessionHeader() {
 
 async function handleApi(req, res, url) {
   const db = readDb();
+  if (req.method === 'GET' && url.pathname === '/api/celestial-bodies') {
+    return json(res, 200, {
+      version: 1,
+      currentBody: 'moon',
+      bodies: launchPlan(),
+      disclaimer: 'Registry placements are digital/commemorative positions and do not convey legal title to celestial territory or resources.'
+    }, securityHeaders());
+  }
+
   if (req.method === 'GET' && url.pathname === '/api/bootstrap') {
     const s = stats(db);
     return json(res, 200, {
