@@ -1,11 +1,21 @@
 import crypto from 'node:crypto';
 import { LANDMARKS, quoteSectors } from './pricing.mjs';
+import { launchPlan } from './celestial-market.mjs';
 import { insertEvent, listClaims, listUnavailableSectorIds } from './supabase.mjs';
 import { boardFromClaims, claimStats, clientIp, json, readBody, sessionUser } from './production-common.mjs';
 
 export async function handlePublicApi(req, res, url) {
   if (req.method === 'GET' && url.pathname === '/api/health') {
     return json(res, 200, { ok: true, service: 'moonstake', mode: 'production', time: new Date().toISOString() });
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/celestial-bodies') {
+    return json(res, 200, {
+      version: 1,
+      currentBody: 'moon',
+      bodies: launchPlan(),
+      disclaimer: 'Registry placements are digital/commemorative positions and do not convey legal title to celestial territory or resources.'
+    });
   }
 
   if (req.method === 'GET' && url.pathname === '/api/bootstrap') {
