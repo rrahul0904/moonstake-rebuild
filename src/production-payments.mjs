@@ -1,6 +1,7 @@
 import { quoteSectors } from './pricing.mjs';
 import {
   attachCheckoutSession,
+  listRegistryTransactions,
   listUnavailableSectorIds,
   processCheckoutCompleted,
   processCheckoutExpired,
@@ -10,7 +11,13 @@ import {
   reserveSectors,
 } from './supabase.mjs';
 import { createCheckoutSession, verifyStripeSignature } from './stripe.mjs';
-import { settleResalePayout } from './production-payouts.mjs';
+import { reverseResalePayout, settleResalePayout } from './production-payouts.mjs';
+import {
+  classifyStripeFinancialProtectionEvent,
+  financialProtectionActor,
+  findResaleTransactionForProtection,
+  shouldAutomaticallyReverseProtection,
+} from './financial-protection.mjs';
 import { json, normalizeUrl, readBody, sessionUser } from './production-common.mjs';
 
 export async function handlePaymentApi(req, res, url) {
@@ -21,6 +28,32 @@ export async function handlePaymentApi(req, res, url) {
     }
     const event = JSON.parse(raw);
     const object = event?.data?.object || {};
+
+    const protection=classifyStripeFinancialProtectionEvent(event);
+    if(protection.relevant){
+      const transactions=await listRegistryTransactions({limit:1000});
+      const transaction=findResaleTransactionForProtection(transactions,protection);
+      if(transaction && shouldAutomaticallyReverseProtection(protection,transaction)){
+        try{
+          await reverseResalePayout({
+            transactionId:transaction.id,
+            reason:protection.reason,
+            actor:financialProtectionActor(event),
+          });
+        }catch(err){
+          console.error('Atlas 259 automatic seller transfer reversal failed:',err.message);
+          return json(res,500,{received:false,error:'Automatic seller transfer reversal failed'});
+        }
+      }else if(transaction){
+        console.warn(
+          `Atlas 259 financial protection requires operator review: ${event.type} transaction=${transaction.id} amount=${protection.amountCents}`,
+        );
+      }else{
+        console.warn(`Atlas 259 financial protection event did not match a resale transaction: ${event.type} ${event.id}`);
+      }
+      return json(res,200,{received:true});
+    }
+
     const isResale = object?.metadata?.transaction_type === 'resale';
     const offerId = object?.metadata?.offer_id;
     const reservationId = object?.metadata?.reservation_id || (!isResale ? object?.client_reference_id : null);
