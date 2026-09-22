@@ -306,3 +306,75 @@ export async function listRegistryTransactions({ bodyId='', limit=250 }={}) {
   const bodyFilter=body ? `body_id=eq.${encodeURIComponent(body)}&` : '';
   return request(`/rest/v1/mld_transactions?${bodyFilter}select=*&order=created_at.desc&limit=${safe}`);
 }
+
+
+export async function getSellerPayoutProfile(userId) {
+  const rows=await request(`/rest/v1/seller_payout_profiles?user_id=eq.${encodeURIComponent(userId)}&select=*`);
+  return rows?.[0] || null;
+}
+
+export async function upsertSellerPayoutProfile({
+  userId,
+  stripeAccountId,
+  onboardingStatus,
+  transfersEnabled,
+  payoutsEnabled,
+  detailsSubmitted,
+  requirementsDueCount,
+}) {
+  const body={
+    user_id:userId,
+    stripe_account_id:stripeAccountId || null,
+    onboarding_status:onboardingStatus || 'not_started',
+    transfers_enabled:Boolean(transfersEnabled),
+    payouts_enabled:Boolean(payoutsEnabled),
+    details_submitted:Boolean(detailsSubmitted),
+    requirements_due_count:Math.max(0,Number(requirementsDueCount)||0),
+    last_stripe_sync_at:new Date().toISOString(),
+    updated_at:new Date().toISOString(),
+  };
+  const rows=await request('/rest/v1/seller_payout_profiles?on_conflict=user_id',{
+    method:'POST',
+    headers:{Prefer:'resolution=merge-duplicates,return=representation'},
+    body,
+  });
+  return rows?.[0] || body;
+}
+
+export async function getMldTransaction(transactionId) {
+  const rows=await request(`/rest/v1/mld_transactions?id=eq.${encodeURIComponent(transactionId)}&select=*`);
+  return rows?.[0] || null;
+}
+
+export async function updateMldTransactionPayout({
+  transactionId,
+  chargeId,
+  transferId,
+  status,
+  error=null,
+}) {
+  const allowed=new Set(['pending','paid','failed']);
+  if(!allowed.has(status))throw new Error('Invalid payout status');
+  const body={
+    payout_status:status,
+    payout_error:error ? String(error).slice(0,500) : null,
+    payout_updated_at:new Date().toISOString(),
+  };
+  if(chargeId)body.stripe_charge_id=chargeId;
+  if(transferId)body.stripe_transfer_id=transferId;
+  const rows=await request(`/rest/v1/mld_transactions?id=eq.${encodeURIComponent(transactionId)}&kind=eq.resale`,{
+    method:'PATCH',
+    headers:{Prefer:'return=representation'},
+    body,
+  });
+  return rows?.[0] || null;
+}
+
+export async function recordMldTransferReversal({ transactionId, reversalId, reason, actor }) {
+  return request('/rest/v1/rpc/mld_record_transfer_reversal',{method:'POST',body:{
+    p_transaction_id:transactionId,
+    p_reversal_id:reversalId,
+    p_reason:reason,
+    p_actor:actor,
+  }});
+}
