@@ -48,29 +48,24 @@ alter table public.mld_lot_metrics
 alter table public.mld_watchlist
   drop constraint if exists mld_watchlist_body_id_check;
 
-do $$
-declare
-  v_surface_bodies text[] := array['moon','mars','mercury','venus','ceres','pluto','europa','titan'];
-begin
-  alter table public.claims
-    add constraint claims_body_id_check check (body_id = any(v_surface_bodies));
-  alter table public.reservations
-    add constraint reservations_body_id_check check (body_id = any(v_surface_bodies));
-  alter table public.claim_sectors
-    add constraint claim_sectors_body_id_check check (body_id = any(v_surface_bodies));
-  alter table public.sector_holds
-    add constraint sector_holds_body_id_check check (body_id = any(v_surface_bodies));
-  alter table public.mld_lots
-    add constraint mld_lots_body_id_check check (body_id = any(v_surface_bodies));
-  alter table public.mld_offers
-    add constraint mld_offers_body_id_check check (body_id = any(v_surface_bodies));
-  alter table public.mld_transactions
-    add constraint mld_transactions_body_id_check check (body_id = any(v_surface_bodies));
-  alter table public.mld_lot_metrics
-    add constraint mld_lot_metrics_body_id_check check (body_id = any(v_surface_bodies));
-  alter table public.mld_watchlist
-    add constraint mld_watchlist_body_id_check check (body_id = any(v_surface_bodies));
-end $$;
+alter table public.claims
+  add constraint claims_body_id_check check (body_id in ('moon','mars','mercury','venus','ceres','pluto','europa','titan'));
+alter table public.reservations
+  add constraint reservations_body_id_check check (body_id in ('moon','mars','mercury','venus','ceres','pluto','europa','titan'));
+alter table public.claim_sectors
+  add constraint claim_sectors_body_id_check check (body_id in ('moon','mars','mercury','venus','ceres','pluto','europa','titan'));
+alter table public.sector_holds
+  add constraint sector_holds_body_id_check check (body_id in ('moon','mars','mercury','venus','ceres','pluto','europa','titan'));
+alter table public.mld_lots
+  add constraint mld_lots_body_id_check check (body_id in ('moon','mars','mercury','venus','ceres','pluto','europa','titan'));
+alter table public.mld_offers
+  add constraint mld_offers_body_id_check check (body_id in ('moon','mars','mercury','venus','ceres','pluto','europa','titan'));
+alter table public.mld_transactions
+  add constraint mld_transactions_body_id_check check (body_id in ('moon','mars','mercury','venus','ceres','pluto','europa','titan'));
+alter table public.mld_lot_metrics
+  add constraint mld_lot_metrics_body_id_check check (body_id in ('moon','mars','mercury','venus','ceres','pluto','europa','titan'));
+alter table public.mld_watchlist
+  add constraint mld_watchlist_body_id_check check (body_id in ('moon','mars','mercury','venus','ceres','pluto','europa','titan'));
 
 -- Existing production data is Moon data. Backfill explicitly before tightening
 -- lot/body consistency.
@@ -136,6 +131,40 @@ begin
   end if;
   return v_body;
 end $$;
+
+create or replace function public.registry_sync_body_from_lot_id()
+returns trigger
+language plpgsql
+as $
+begin
+  new.body_id := public.registry_body_from_position_id(new.lot_id);
+  return new;
+end $;
+
+drop trigger if exists trg_registry_lots_body on public.mld_lots;
+create trigger trg_registry_lots_body
+before insert or update of lot_id on public.mld_lots
+for each row execute function public.registry_sync_body_from_lot_id();
+
+drop trigger if exists trg_registry_offers_body on public.mld_offers;
+create trigger trg_registry_offers_body
+before insert or update of lot_id on public.mld_offers
+for each row execute function public.registry_sync_body_from_lot_id();
+
+drop trigger if exists trg_registry_transactions_body on public.mld_transactions;
+create trigger trg_registry_transactions_body
+before insert or update of lot_id on public.mld_transactions
+for each row execute function public.registry_sync_body_from_lot_id();
+
+drop trigger if exists trg_registry_metrics_body on public.mld_lot_metrics;
+create trigger trg_registry_metrics_body
+before insert or update of lot_id on public.mld_lot_metrics
+for each row execute function public.registry_sync_body_from_lot_id();
+
+drop trigger if exists trg_registry_watchlist_body on public.mld_watchlist;
+create trigger trg_registry_watchlist_body
+before insert or update of lot_id on public.mld_watchlist
+for each row execute function public.registry_sync_body_from_lot_id();
 
 create or replace function public.registry_record_primary_sale(
   p_body_id text,
@@ -407,6 +436,42 @@ begin
   return v_claim;
 end $$;
 
+create or replace function public.snapshot_moon_index_after_transaction()
+returns trigger
+language plpgsql
+security definer
+set search_path=public
+as $
+declare
+  v_gmv bigint;
+  v_owned integer;
+  v_index numeric(14,4);
+begin
+  if new.body_id <> 'moon' then
+    return new;
+  end if;
+
+  select coalesce(sum(gross_cents),0)::bigint
+    into v_gmv
+  from public.mld_transactions
+  where body_id='moon';
+
+  select count(*)::integer
+    into v_owned
+  from public.mld_lots
+  where body_id='moon';
+
+  v_index := round(100::numeric + (v_gmv::numeric / 25920000::numeric) * 100::numeric,4);
+
+  insert into public.market_index_snapshots(
+    body_id,transaction_id,index_value,gross_market_volume_cents,owned_lots,created_at
+  )
+  values('moon',new.id,v_index,v_gmv,v_owned,new.created_at)
+  on conflict(transaction_id) do nothing;
+
+  return new;
+end $;
+
 create or replace view public.registry_body_market_summary with (security_invoker=true) as
 select
   t.body_id,
@@ -463,6 +528,7 @@ grant select on public.registry_body_market_summary,public.registry_position_dir
 
 revoke execute on function public.registry_body_from_position_id(text)
   from public,anon,authenticated;
+revoke execute on function public.registry_sync_body_from_lot_id() from public,anon,authenticated;
 revoke execute on function public.registry_record_primary_sale(text,text,integer,integer,uuid,integer,text)
   from public,anon,authenticated;
 revoke execute on function public.reserve_body_registry_positions(text,uuid,text,text,text,text[],integer[],integer,integer)
@@ -473,6 +539,7 @@ revoke execute on function public.process_stripe_checkout_completed(text,uuid,te
   from public,anon,authenticated;
 
 grant execute on function public.registry_body_from_position_id(text) to service_role;
+grant execute on function public.registry_sync_body_from_lot_id() to service_role;
 grant execute on function public.registry_record_primary_sale(text,text,integer,integer,uuid,integer,text)
   to service_role;
 grant execute on function public.reserve_body_registry_positions(text,uuid,text,text,text,text[],integer[],integer,integer)
