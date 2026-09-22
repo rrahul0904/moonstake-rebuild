@@ -221,7 +221,7 @@ function toast(message){const t=$('#toast');t.textContent=message;t.classList.re
 
 function setAuthMode(mode){state.authMode=mode;const signup=mode==='signup';$('#auth-signin-tab').classList.toggle('active',!signup);$('#auth-signup-tab').classList.toggle('active',signup);$('#brand-field').classList.toggle('hidden',!signup);$('#auth-title').textContent=signup?'Create your Atlas 259 account':'Sign in to register a position';$('#auth-password').autocomplete=signup?'new-password':'current-password'}
 function openAuth(){setAuthMode('signin');showModal('#auth-modal')}
-function openClaim(){if(!state.selected.size)return;if(!state.user){state.pendingClaimAfterAuth=true;openAuth();return}$('#claim-brand').value=state.user.brand||'';$('#claim-tagline').value='';$('#claim-url').value='';$('#claim-summary').textContent=`${state.selected.size} registry position${state.selected.size===1?'':'s'} · demo checkout`;$('#claim-total').textContent=`${state.quote.total}`;showModal('#claim-modal')}
+function openClaim(){if(!state.selected.size)return;if(!state.user){state.pendingClaimAfterAuth=true;openAuth();return}$('#claim-brand').value=state.user.brand||'';$('#claim-tagline').value='';$('#claim-url').value='';$('#claim-summary').textContent=`${state.selected.size} registry position${state.selected.size===1?'':'s'} · checkout`;$('#claim-total').textContent=`${state.quote.total}`;showModal('#claim-modal')}
 
 async function watchLot(lotId,action='add'){
   if(!state.user){openAuth();toast('Sign in to manage your watchlist');return}
@@ -411,7 +411,41 @@ $('#offer-form').addEventListener('submit',async e=>{
   }catch(err){error.textContent=err.message;error.classList.remove('hidden')}
 });
 
-$('#claim-form').addEventListener('submit',async e=>{e.preventDefault();const error=$('#claim-error');error.classList.add('hidden');try{const data=await api('/api/claims',{method:'POST',body:JSON.stringify({brand:$('#claim-brand').value,tagline:$('#claim-tagline').value,url:$('#claim-url').value,sectors:[...state.selected]})});closeModals();state.selected.clear();state.quote={count:0,total:0,unavailable:[]};renderSelection();await refresh();const claim=state.claims.find(c=>c.id===data.claim.id)||data.claim;positionFlagCard(claim);toast('Registry position added on the Moon')}catch(err){error.textContent=err.message;error.classList.remove('hidden')}});
+$('#claim-form').addEventListener('submit',async e=>{
+  e.preventDefault();
+  const error=$('#claim-error');
+  const submit=e.currentTarget.querySelector('button[type="submit"]');
+  error.classList.add('hidden');
+  if(submit)submit.disabled=true;
+  try{
+    const data=await api('/api/claims',{method:'POST',body:JSON.stringify({
+      brand:$('#claim-brand').value,
+      tagline:$('#claim-tagline').value,
+      url:$('#claim-url').value,
+      sectors:[...state.selected]
+    })});
+
+    if(data?.payment?.status==='requires_action'&&data.payment.url){
+      location.assign(data.payment.url);
+      return;
+    }
+
+    if(!data?.claim?.id)throw new Error('Registry response did not include a claim or checkout action');
+
+    closeModals();
+    state.selected.clear();
+    state.quote={count:0,total:0,unavailable:[]};
+    renderSelection();
+    await refresh();
+    const claim=state.claims.find(c=>c.id===data.claim.id)||data.claim;
+    positionFlagCard(claim);
+    toast('Registry position added on the Moon');
+  }catch(err){
+    error.textContent=err.message;
+    error.classList.remove('hidden');
+    if(submit)submit.disabled=false;
+  }
+});
 
 const search=$('#search');search.addEventListener('input',()=>{const q=search.value.trim().toLowerCase();const box=$('#search-results');if(!q){box.classList.add('hidden');return}const landmarks=state.landmarks.filter(l=>`${l.name} ${l.subtitle}`.toLowerCase().includes(q)).slice(0,5);const brands=state.claims.filter(c=>`${c.brand} ${c.tagline}`.toLowerCase().includes(q)).slice(0,5);const rows=[...landmarks.map(l=>({kind:'landmark',id:l.id,title:l.name,sub:`Reference landmark · ${l.subtitle}`})),...brands.map(c=>({kind:'claim',id:c.id,title:c.brand,sub:c.tagline||'Brand flag'}))];box.innerHTML=rows.length?rows.map(r=>`<button class="search-result" data-kind="${r.kind}" data-id="${r.id}"><span>${escapeHtml(r.title)}</span><small>${escapeHtml(r.sub)}</small></button>`).join(''):'<button class="search-result" disabled><span>No results</span><small>Try Tycho or Apollo 11</small></button>';box.classList.remove('hidden');$$('.search-result[data-id]').forEach(btn=>btn.onclick=()=>{box.classList.add('hidden');search.value=btn.querySelector('span').textContent;if(btn.dataset.kind==='landmark'){const l=state.landmarks.find(x=>x.id===btn.dataset.id);focusSector(l.lotX??l.x,l.lotY??l.y,3.3)}else{const c=state.claims.find(x=>x.id===btn.dataset.id);const pos=displayCoords(c.sectors[0]);if(pos){focusSector(pos.x,pos.y,3);positionFlagCard(c)}}})});document.addEventListener('click',e=>{if(!e.target.closest('.search-wrap'))$('#search-results').classList.add('hidden')});
 
