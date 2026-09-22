@@ -135,11 +135,11 @@ end $$;
 create or replace function public.registry_sync_body_from_lot_id()
 returns trigger
 language plpgsql
-as $
+as $$
 begin
   new.body_id := public.registry_body_from_position_id(new.lot_id);
   return new;
-end $;
+end $$;
 
 drop trigger if exists trg_registry_lots_body on public.mld_lots;
 create trigger trg_registry_lots_body
@@ -441,7 +441,7 @@ returns trigger
 language plpgsql
 security definer
 set search_path=public
-as $
+as $$
 declare
   v_gmv bigint;
   v_owned integer;
@@ -470,7 +470,7 @@ begin
   on conflict(transaction_id) do nothing;
 
   return new;
-end $;
+end $$;
 
 create or replace view public.claim_directory with (security_invoker=true) as
 select
