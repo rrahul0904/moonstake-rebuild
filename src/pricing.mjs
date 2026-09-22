@@ -18,6 +18,8 @@ export const LANDMARKS = Object.freeze(RAW_LANDMARKS.map((landmark) => {
   const canonical = latLonToLot(landmark.lat, landmark.lon);
   return Object.freeze({
     ...landmark,
+    labelType:'reference-landmark',
+    authorityStatus:'curated-seed',
     lotId: `MOON-${String(canonical.x).padStart(3,'0')}-${String(canonical.y).padStart(3,'0')}`,
     lotX: canonical.x,
     lotY: canonical.y,
