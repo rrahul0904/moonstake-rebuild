@@ -90,6 +90,12 @@ alter table public.claim_sectors
   );
 
 alter table public.mld_lots
+  drop constraint if exists mld_lots_x_y_key;
+
+alter table public.mld_lots
+  add constraint registry_lots_body_xy_key unique(body_id,x,y);
+
+alter table public.mld_lots
   drop constraint if exists mld_lots_check;
 
 alter table public.mld_lots
