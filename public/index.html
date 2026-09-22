@@ -83,7 +83,7 @@
       <article><b>02</b><h3>Select your lots</h3><p>Switch to Select, click one or more available registry positions, and see the price update instantly.</p></article>
       <article><b>03</b><h3>Plant your flag</h3><p>Sign in, add your brand and link, then register. Your marker appears on the map and the board.</p></article>
     </div>
-    <p class="fineprint">Atlas 259 sells digital advertising/registry placements only — not legal title to celestial land or resources. Scientific/reference place names remain separate from user-created Atlas labels; buying a position never renames an official feature. Atlas 259 is not affiliated with NASA, USGS, IAU, or any government land registry. This demo checkout does not charge money.</p>
+    <p class="fineprint">Atlas 259 sells digital advertising/registry placements only — not legal title to celestial land or resources. Scientific/reference place names remain separate from user-created Atlas labels; buying a position never renames an official feature. Atlas 259 is not affiliated with NASA, USGS, IAU, or any government land registry. Production purchases use secure Stripe Checkout; local development can use a simulated checkout.</p>
   </section>
 
   <section id="auth-modal" class="modal compact hidden" role="dialog" aria-modal="true" aria-labelledby="auth-title">
@@ -109,7 +109,7 @@
       <label>Tagline<input id="claim-tagline" maxlength="140" placeholder="What are you shipping?" /></label>
       <label>Website<input id="claim-url" inputmode="url" placeholder="https://example.com" /></label>
       <div class="checkout-summary"><span id="claim-summary"></span><strong id="claim-total"></strong></div>
-      <p class="fineprint">Digital registry placement only — not legal celestial real estate or resource rights. Demo checkout confirms the flow without charging a card.</p>
+      <p class="fineprint">Digital registry placement only — not legal celestial real estate or resource rights. Production checkout uses Stripe and ownership is finalized only after verified payment.</p>
       <p id="claim-error" class="form-error hidden"></p>
       <button class="primary-wide" type="submit">Confirm registry position</button>
     </form>
