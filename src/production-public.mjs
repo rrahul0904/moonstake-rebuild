@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import { LANDMARKS, quoteSectors } from './pricing.mjs';
 import { launchPlan } from './celestial-market.mjs';
-import { getMldMarketSummary, insertEvent, listClaims, listMoonIndexHistory, listRecentMldActivity, listUnavailableSectorIds, recordMldLotEvent } from './supabase.mjs';
+import { getMldMarketSummary, insertEvent, listClaims, listMoonIndexHistory, listRecentMldActivity, listRegistryBodyMarketSummaries, listRegistryPositionsForOwner, listUnavailableSectorIds, recordMldLotEvent } from './supabase.mjs';
 import { boardFromClaims, claimStats, clientIp, json, readBody, sessionUser } from './production-common.mjs';
 
 export async function handlePublicApi(req, res, url) {
@@ -10,11 +10,24 @@ export async function handlePublicApi(req, res, url) {
   }
 
   if (req.method === 'GET' && url.pathname === '/api/celestial-bodies') {
-    return json(res, 200, {
-      version: 1,
-      currentBody: 'moon',
-      bodies: launchPlan(),
-      disclaimer: 'Registry placements are digital/commemorative positions and do not convey legal title to celestial territory or resources.'
+    const summaries=await listRegistryBodyMarketSummaries().catch(()=>[]);
+    const byBody=new Map((summaries||[]).map(row=>[row.body_id,row]));
+    return json(res,200,{
+      version:2,
+      currentBody:'moon',
+      bodies:launchPlan().map(body=>{
+        const market=byBody.get(body.id);
+        return {
+          ...body,
+          market:{
+            ownedPositions:Number(market?.owned_positions||0),
+            grossMarketVolumeCents:Number(market?.gross_market_volume_cents||0),
+            platformRevenueCents:Number(market?.platform_revenue_cents||0),
+            transactionCount:Number(market?.transaction_count||0),
+          }
+        };
+      }),
+      disclaimer:'Registry placements are digital/commemorative positions and do not convey legal title to celestial territory or resources.'
     });
   }
 
@@ -70,10 +83,36 @@ export async function handlePublicApi(req, res, url) {
   }
 
   if (req.method === 'GET' && url.pathname === '/api/my-land') {
-    const auth = await sessionUser(req, res);
-    if (!auth) return json(res, 401, { error: 'Sign in required' });
-    const s = claimStats(await listClaims());
-    return json(res, 200, { claims: s.claims.filter((c) => c.userId === auth.user.id) });
+    const auth=await sessionUser(req,res);
+    if(!auth)return json(res,401,{error:'Sign in required'});
+    const s=claimStats(await listClaims());
+    const claims=s.claims.filter((c)=>c.userId===auth.user.id);
+    const positions=await listRegistryPositionsForOwner(auth.user.id).catch(()=>[]);
+    return json(res,200,{claims,positions});
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/portfolio') {
+    const auth=await sessionUser(req,res);
+    if(!auth)return json(res,401,{error:'Sign in required'});
+    const requestedBody=String(url.searchParams.get('body')||'').trim().toLowerCase();
+    const positions=await listRegistryPositionsForOwner(auth.user.id,requestedBody);
+    const s=claimStats(await listClaims());
+    const claims=s.claims.filter((c)=>c.userId===auth.user.id && (!requestedBody || c.bodyId===requestedBody));
+    const grouped={};
+    for(const body of launchPlan()){
+      const bodyPositions=positions.filter((p)=>p.body_id===body.id);
+      const bodyClaims=claims.filter((claim)=>claim.bodyId===body.id);
+      if(bodyPositions.length||bodyClaims.length){
+        grouped[body.id]={
+          bodyId:body.id,
+          bodyName:body.name,
+          positions:bodyPositions,
+          claims:bodyClaims,
+          positionCount:bodyPositions.length,
+        };
+      }
+    }
+    return json(res,200,{requestedBody:requestedBody||null,worlds:grouped});
   }
 
   if (req.method === 'POST' && url.pathname === '/api/quote') {
