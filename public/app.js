@@ -208,7 +208,12 @@ function renderSelection(){const q=state.quote;$('#sector-count').textContent=`$
 async function bootstrap(){
   const data=await api('/api/bootstrap');Object.assign(state,{claims:data.claims,landmarks:data.landmarks,user:data.user,stats:data.stats});renderAuthState();updateStats();draw();setTimeout(()=>$('#boot').classList.add('done'),450);
   const params=new URLSearchParams(location.search);
-  if(state.user&&params.get('seller_onboarding')==='return'){
+  if(state.user&&params.get('seller_onboarding')==='refresh'){
+    api('/api/seller/onboarding',{method:'POST'}).then((result)=>{
+      if(result.onboardingUrl){location.assign(result.onboardingUrl);return}
+      toast(result.ready?'Seller payouts are ready':'Unable to refresh Stripe onboarding');
+    }).catch((err)=>toast(err.message));
+  }else if(state.user&&params.get('seller_onboarding')==='return'){
     api('/api/seller/sync',{method:'POST'}).then((result)=>{
       toast(result?.profile?.resale_payout_ready||result?.profile?.transfers_enabled?'Seller payouts are ready':'Stripe onboarding saved · additional requirements may remain');
       params.delete('seller_onboarding');
