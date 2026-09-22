@@ -19,13 +19,22 @@ function render(){
   $('#users').innerHTML=rows.length?rows.map(u=>`<article class="claim"><div class="head"><div><div class="brand">${esc(u.brand||u.email||'User')}</div><div class="meta">${esc(u.email||'—')} · ${esc(u.id)}</div></div><span class="badge ${u.claims?'active':''}">${u.claims?'buyer':'user'}</span></div><div class="copy">${u.claims} claims · ${u.activeClaims} active · ${money(u.grossPaidCents)} paid · ${u.views} views · ${u.clicks} clicks</div><div class="ids">Joined: ${esc(date(u.createdAt))}<br>Last sign-in: ${esc(date(u.lastSignInAt))}<br>Email confirmed: ${esc(date(u.emailConfirmedAt))}</div></article>`).join(''):'<div class="empty">No matching users.</div>';
  } else {
   const summary=market.summary||{},transactions=market.transactions||[],offers=market.offers||[];
-  const pendingPayouts=transactions.filter(t=>t.payout_status==='pending').length;
+  const pendingPayouts=transactions.filter(t=>['pending','failed'].includes(t.payout_status)).length;
   const pendingOffers=offers.filter(o=>o.status==='pending').length;
-  $('#summary').hidden=false;$('#summary').innerHTML=`<div class="metric"><strong>${money(summary.gross_market_volume_cents||0)}</strong><span>Marketplace GMV</span></div><div class="metric"><strong>${money(summary.mld_revenue_cents||0)}</strong><span>Registry fees</span></div><div class="metric"><strong>${pendingOffers}</strong><span>Pending offers</span></div><div class="metric"><strong>${pendingPayouts}</strong><span>Pending payouts</span></div>`;
+  $('#summary').hidden=false;$('#summary').innerHTML=`<div class="metric"><strong>${money(summary.gross_market_volume_cents||0)}</strong><span>Marketplace GMV</span></div><div class="metric"><strong>${money(summary.mld_revenue_cents||0)}</strong><span>Registry fees</span></div><div class="metric"><strong>${pendingOffers}</strong><span>Pending offers</span></div><div class="metric"><strong>${pendingPayouts}</strong><span>Unsettled payouts</span></div>`;
   const qrows=transactions.filter(t=>!q||[t.lot_id,t.kind,t.buyer_user_id,t.seller_user_id,t.payout_status,t.stripe_payment_intent_id].join(' ').toLowerCase().includes(q));
   const orows=offers.filter(o=>!q||[o.lot_id,o.status,o.buyer_user_id,o.id].join(' ').toLowerCase().includes(q));
   $('#market').innerHTML=`<article class="claim"><div class="brand">Moon Index</div><div class="copy">${Number(summary.moon_index||100).toFixed(2)} · ${Number(summary.owned_lots||0).toLocaleString()} of ${Number(summary.total_lots||259200).toLocaleString()} positions owned</div></article>`+
-    qrows.map(t=>`<article class="claim"><div class="head"><div><div class="brand">${esc(t.lot_id)} · ${esc(t.kind)}</div><div class="meta">${money(t.gross_cents)} gross · ${money(t.mld_fee_cents)} fee · ${money(t.seller_payout_cents)} seller payout</div></div><span class="badge ${t.payout_status==='paid'?'active':t.payout_status==='failed'?'refunded':''}">${esc(t.payout_status)}</span></div><div class="ids">Buyer: ${esc(t.buyer_user_id||'—')}<br>Seller: ${esc(t.seller_user_id||'—')}<br>Payment: ${esc(t.stripe_payment_intent_id||'—')}<br>Created: ${esc(date(t.created_at))}</div></article>`).join('')+
+    qrows.map(t=>{
+      const retry=t.kind==='resale'&&['pending','failed'].includes(t.payout_status)
+        ? `<button data-market-action="retry" data-id="${esc(t.id)}">Retry seller payout</button>`
+        : '';
+      const reverse=t.kind==='resale'&&t.payout_status==='paid'&&t.stripe_transfer_id
+        ? `<button class="danger" data-market-action="reverse" data-id="${esc(t.id)}">Reverse seller transfer</button>`
+        : '';
+      const actions=retry||reverse?`<div class="actions">${retry}${reverse}</div>`:'';
+      return `<article class="claim"><div class="head"><div><div class="brand">${esc(t.lot_id)} · ${esc(t.kind)}</div><div class="meta">${money(t.gross_cents)} gross · ${money(t.mld_fee_cents)} fee · ${money(t.seller_payout_cents)} seller payout</div></div><span class="badge ${t.payout_status==='paid'?'active':t.payout_status==='failed'||t.payout_status==='reversed'?'refunded':''}">${esc(t.payout_status)}</span></div><div class="ids">Buyer: ${esc(t.buyer_user_id||'—')}<br>Seller: ${esc(t.seller_user_id||'—')}<br>Payment intent: ${esc(t.stripe_payment_intent_id||'—')}<br>Source charge: ${esc(t.stripe_charge_id||'—')}<br>Seller transfer: ${esc(t.stripe_transfer_id||'—')}<br>Transfer reversal: ${esc(t.stripe_transfer_reversal_id||'—')}<br>Payout error: ${esc(t.payout_error||'—')}<br>Created: ${esc(date(t.created_at))}</div>${actions}</article>`;
+    }).join('')+
     orows.map(o=>`<article class="claim"><div class="head"><div><div class="brand">Offer · ${esc(o.lot_id)}</div><div class="meta">${money(o.amount_cents)} · buyer ${esc(o.buyer_user_id)}</div></div><span class="badge ${o.status==='accepted'?'active':''}">${esc(o.status)}</span></div><div class="ids">Offer ID: ${esc(o.id)}<br>Created: ${esc(date(o.created_at))}</div></article>`).join('');
  }
 }
@@ -33,4 +42,25 @@ async function load(){try{$('#status').textContent='Loading operator data…';co
 $('#refresh').addEventListener('click',load);$('#search').addEventListener('input',render);
 $('#claims-tab').addEventListener('click',()=>{view='claims';render()});$('#users-tab').addEventListener('click',()=>{view='users';render()});$('#market-tab').addEventListener('click',()=>{view='market';render()});
 $('#claims').addEventListener('click',async e=>{const button=e.target.closest('button[data-action]');if(!button)return;const action=button.dataset.action;if(action==='visit'){open(button.dataset.url,'_blank','noopener');return}const claim=claims.find(c=>c.id===button.dataset.id);if(!claim)return;if(action==='refund'){if(!confirm(`Issue a full Stripe refund for ${claim.brand} (${money(claim.amount_cents)})?`))return;const note=prompt('Internal refund note (optional):','')||'';button.disabled=true;try{const data=await api('/api/admin/refund',{method:'POST',body:JSON.stringify({claimId:claim.id,reason:'requested_by_customer',note})});alert(`Stripe refund ${data.refund.id}: ${data.refund.status}`);await load()}catch(err){alert(err.message);button.disabled=false}return}button.disabled=true;try{await api('/api/admin/moderate',{method:'POST',body:JSON.stringify({claimId:claim.id,status:action})});await load()}catch(err){alert(err.message);button.disabled=false}});
+$('#market').addEventListener('click',async e=>{
+ const button=e.target.closest('button[data-market-action]');
+ if(!button)return;
+ const transaction=market.transactions.find(t=>t.id===button.dataset.id);
+ if(!transaction)return;
+ const action=button.dataset.marketAction;
+ button.disabled=true;
+ try{
+  if(action==='retry'){
+   const result=await api('/api/admin/marketplace/payout/retry',{method:'POST',body:JSON.stringify({transactionId:transaction.id})});
+   alert(result.status==='paid'?'Seller transfer paid: '+(result.transferId||'recorded'):'Payout status: '+result.status);
+  }else if(action==='reverse'){
+   const reason=(prompt('Transfer reversal reason: refund, dispute, or correction','correction')||'').trim().toLowerCase();
+   if(!['refund','dispute','correction'].includes(reason))throw new Error('Reason must be refund, dispute, or correction');
+   if(!confirm('Reverse seller transfer '+transaction.stripe_transfer_id+' for '+money(transaction.seller_payout_cents)+'?')){button.disabled=false;return}
+   const result=await api('/api/admin/marketplace/payout/reverse',{method:'POST',body:JSON.stringify({transactionId:transaction.id,reason})});
+   alert('Transfer reversed: '+(result.reversalId||'recorded'));
+  }
+  await load();
+ }catch(err){alert(err.message);button.disabled=false}
+});
 load();
