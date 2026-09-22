@@ -157,6 +157,7 @@ export function claimStats(rows) {
   const claims = (rows || []).map((r) => ({
     id: r.id,
     userId: r.user_id,
+    bodyId: r.body_id || 'moon',
     brand: r.brand,
     tagline: r.tagline || '',
     url: r.url || '',
