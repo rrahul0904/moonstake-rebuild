@@ -374,15 +374,16 @@ async function showPanel(tab){
       const data=await api('/api/offers/mine');
       const payout=data.payout||{};
       const connect=data.connect||{enabled:false};
-      const payoutText=payout.resale_payout_ready?'Seller payouts ready':`Seller payouts: ${payout.onboarding_status||'not started'}`;
-      const payoutAction=payout.resale_payout_ready
+      const payoutReady=Boolean(connect.enabled&&payout.resale_payout_ready);
+      const payoutText=payoutReady?'Seller payouts ready':`Seller payouts: ${payout.onboarding_status||'not started'}`;
+      const payoutAction=payoutReady
         ? '<span class="fineprint">Stripe seller transfers enabled.</span>'
         : connect.enabled
           ? '<button id="seller-payout-setup" class="claim-btn">Set up seller payouts</button>'
           : '<span class="fineprint">Seller payouts are launch-gated until Stripe Connect is enabled for this deployment.</span>';
       const received=(data.received||[]).map(o=>{
         const action=o.status==='pending'
-          ? `<button class="ghost-btn" data-accept-offer="${o.id}" ${payout.resale_payout_ready?'':'disabled'}>Accept</button>`
+          ? `<button class="ghost-btn" data-accept-offer="${o.id}" ${payoutReady?'':'disabled'}>Accept</button>`
           : '';
         return `<div class="mine-row"><span class="rank">↓</span><div class="row-copy"><strong>${escapeHtml(o.lot_id)} · ${(Number(o.amount_cents)/100).toFixed(2)}</strong><small>Received · ${escapeHtml(o.status)}${o.payment_due_at?' · pay by '+new Date(o.payment_due_at).toLocaleString():''}</small></div><div class="row-metrics">${action}</div></div>`;
       }).join('');
@@ -393,7 +394,7 @@ async function showPanel(tab){
         if(o.status==='accepted_pending_payment')action=`<button class="claim-btn" data-pay-offer="${o.id}">Pay</button>`;
         return `<div class="mine-row"><span class="rank">↑</span><div class="row-copy"><strong>${escapeHtml(o.lot_id)} · ${(Number(o.amount_cents)/100).toFixed(2)}</strong><small>Sent · ${escapeHtml(o.status)}${o.payment_due_at?' · pay by '+new Date(o.payment_due_at).toLocaleString():''}</small></div><div class="row-metrics">${action}</div></div>`;
       }).join('');
-      $('#panel-content').innerHTML=`<div class="panel-empty">${escapeHtml(payoutText)}${payout.resale_payout_ready?'':' · payout onboarding must be enabled before you can accept cash resale offers.'}<div class="panel-cta">${payoutAction}</div></div><div class="panel-section"><strong>Received</strong>${received||'<div class="panel-empty">No received offers.</div>'}</div><div class="panel-section"><strong>Sent</strong>${sent||'<div class="panel-empty">No sent offers.</div>'}</div><div class="panel-section"><strong>Watchlist</strong>${watched||'<div class="panel-empty">No watched positions.</div>'}</div>`;
+      $('#panel-content').innerHTML=`<div class="panel-empty">${escapeHtml(payoutText)}${payoutReady?'':' · payout onboarding must be enabled before you can accept cash resale offers.'}<div class="panel-cta">${payoutAction}</div></div><div class="panel-section"><strong>Received</strong>${received||'<div class="panel-empty">No received offers.</div>'}</div><div class="panel-section"><strong>Sent</strong>${sent||'<div class="panel-empty">No sent offers.</div>'}</div><div class="panel-section"><strong>Watchlist</strong>${watched||'<div class="panel-empty">No watched positions.</div>'}</div>`;
       const payoutSetup=$('#seller-payout-setup');
       if(payoutSetup)payoutSetup.onclick=async()=>{
         payoutSetup.disabled=true;
