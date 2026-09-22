@@ -76,7 +76,21 @@ Preferred Atlas 259 settlement path:
 8. Ownership transfer and payment settlement are idempotent and auditable.
 9. Failed payouts do not silently disappear; they appear in the operator console.
 
-For a marketplace where the platform receives the charge first and may need controlled settlement timing, evaluate **Separate Charges and Transfers** as the default implementation. Final charge type should be confirmed against the production Connect configuration and supported seller countries before launch.
+Atlas 259 now implements **Separate Charges and Transfers** behind a fail-closed feature gate:
+
+- `STRIPE_CONNECT_ENABLED=true` is required before seller onboarding or transfers can execute.
+- Sellers use Stripe Express connected accounts with the transfers capability requested.
+- Stripe-hosted Account Links collect onboarding requirements.
+- Atlas syncs `details_submitted`, transfer capability, payout capability and outstanding requirement count into `seller_payout_profiles`.
+- Sellers cannot accept a cash resale offer until the stored account state is transfer-ready.
+- A verified resale Checkout webhook records ownership first, then attempts the seller transfer.
+- The transfer is tied to the PaymentIntent's latest source charge through `source_transaction`.
+- Transfer creation uses a transaction-scoped Stripe idempotency key.
+- Payout failures remain on the transaction ledger and can be retried from the operator console.
+- Paid transfers can be fully reversed by an operator for a recorded `refund`, `dispute`, or `correction` reason.
+- A payout failure never rolls back or duplicates verified ownership settlement.
+
+Repository implementation is not production activation. Stripe Connect must still be enabled for the platform account and certified in a sandbox with a real connected test seller before resale launch.
 
 ## Stripe account readiness
 
@@ -101,15 +115,19 @@ Do not commit Stripe account IDs, secret keys, personal addresses, bank details,
 
 Primary purchase refunds are supported through the operator console.
 
-Before resale launch, add explicit behavior for:
+Repository behavior now covers:
 
-- refund before seller transfer
-- refund after seller transfer
-- negative connected-account balance
-- dispute/chargeback after transfer
-- transfer reversal where supported
-- payout failure
-- ownership rollback policy
+- payout failure persistence and operator retry
+- transfer reversal for refund/dispute/correction after a paid seller transfer
+- idempotent ownership settlement independent from payout execution
+
+Still required before resale launch certification:
+
+- sandbox evidence for refund before seller transfer
+- sandbox evidence for refund after seller transfer + reversal
+- negative connected-account balance behavior
+- automatic dispute/chargeback event handling
+- written ownership policy for a post-settlement refund/dispute
 - moderation/takedown refund policy
 
 The registry ledger must never imply that a successful UI state means money has settled unless Stripe confirms the relevant event.
@@ -126,3 +144,25 @@ Before broad marketplace launch, obtain appropriate tax/legal review for:
 - consumer refund/disclosure requirements
 
 Atlas 259 should market registry visibility, collecting, sponsorship, identity and discovery — not expected financial returns.
+
+
+## Connect activation checklist
+
+The Connect code path is deliberately disabled by default.
+
+Before setting `STRIPE_CONNECT_ENABLED=true` in a hosted environment:
+
+1. Complete the Stripe Connect platform profile and verification.
+2. Confirm Express connected accounts and transfers are supported for intended seller countries.
+3. Configure the hosted Atlas 259 domain and support/business information.
+4. Apply database migrations through `0010_stripe_connect_reconciliation.sql`.
+5. Create a sandbox seller through the Atlas 259 seller-onboarding UI.
+6. Complete Stripe-hosted onboarding and verify `transfers_enabled` is synchronized.
+7. Execute a test-mode resale from offer → acceptance → Checkout → signed webhook → ownership transfer → seller transfer.
+8. Verify the transaction stores PaymentIntent, source charge, transfer ID and `payout_status=paid`.
+9. Exercise operator retry using a controlled failed-transfer case.
+10. Exercise a sandbox transfer reversal and verify the reversal ID/audit row.
+11. Run browser/mobile UAT and the hosted preview certification workflow.
+12. Only then consider enabling the same flow in live mode.
+
+Never enable the flag merely because repository tests are green.
