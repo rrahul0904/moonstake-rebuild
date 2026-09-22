@@ -158,6 +158,7 @@ export function claimStats(rows) {
     id: r.id,
     userId: r.user_id,
     bodyId: r.body_id || 'moon',
+    labelType: 'atlas-label',
     brand: r.brand,
     tagline: r.tagline || '',
     url: r.url || '',
