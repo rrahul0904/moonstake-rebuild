@@ -110,7 +110,7 @@ export async function handleMarketplaceApi(req,res,url) {
       getSellerPayoutReadiness(auth.user.id),
       listMldWatchlist(auth.user.id),
     ]);
-    return json(res,200,{sent,received,payout,watchlist});
+    return json(res,200,{sent,received,payout,watchlist,connect:connectAvailability()});
   }
 
   if(req.method==='POST'&&url.pathname==='/api/offers'){
