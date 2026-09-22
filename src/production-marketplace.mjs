@@ -149,6 +149,9 @@ export async function handleMarketplaceApi(req,res,url) {
   if(req.method==='POST'&&accept){
     const auth=await sessionUser(req,res);
     if(!auth)return json(res,401,{error:'Sign in required'});
+    if(!connectAvailability().enabled){
+      return json(res,503,{error:'Seller payouts are disabled for this deployment'});
+    }
     try{
       await acceptMldOffer({offerId:accept[1],sellerUserId:auth.user.id,paymentWindowHours:24});
       return json(res,200,{offer:await getMldOffer(accept[1])});
