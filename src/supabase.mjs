@@ -77,20 +77,23 @@ export async function listUnavailableSectorIds() {
   return [...new Set([...(claimed || []).map(x => x.sector_id), ...(held || []).map(x => x.sector_id)])];
 }
 
-export async function reserveSectors({ userId, brand, tagline, url, sectors, pricesCents, amountCents, ttlSeconds=2100 }) {
-  const canonical = (sectors || []).every((id) => /^MOON-\d{3}-\d{3}$/.test(String(id)));
-  if (canonical) {
-    if (!Array.isArray(pricesCents) || pricesCents.length !== sectors.length) {
+export async function reserveSectors({ bodyId='moon', userId, brand, tagline, url, sectors, pricesCents, amountCents, ttlSeconds=2100 }) {
+  const body=String(bodyId||'moon').trim().toLowerCase();
+  const canonical=(sectors||[]).every((id)=>/^(MOON|MARS|MERCURY|VENUS|CERES|PLUTO|EUROPA|TITAN)-\d{3}-\d{3}$/.test(String(id)));
+  if(canonical){
+    if(!Array.isArray(pricesCents)||pricesCents.length!==sectors.length){
       throw new Error('Canonical registry reservations require a per-position price ledger');
     }
-    return request('/rest/v1/rpc/reserve_registry_positions', { method:'POST', body:{
-      p_user_id:userId, p_brand:brand, p_tagline:tagline, p_url:url || null,
-      p_position_ids:sectors, p_price_cents:pricesCents, p_amount_cents:amountCents, p_ttl_seconds:ttlSeconds
+    return request('/rest/v1/rpc/reserve_body_registry_positions',{method:'POST',body:{
+      p_body_id:body,
+      p_user_id:userId,p_brand:brand,p_tagline:tagline,p_url:url||null,
+      p_position_ids:sectors,p_price_cents:pricesCents,p_amount_cents:amountCents,p_ttl_seconds:ttlSeconds
     }});
   }
-  return request('/rest/v1/rpc/reserve_sectors', { method:'POST', body:{
-    p_user_id:userId, p_brand:brand, p_tagline:tagline, p_url:url || null,
-    p_sector_ids:sectors, p_amount_cents:amountCents, p_ttl_seconds:ttlSeconds
+  if(body!=='moon')throw new Error('Legacy sector reservations are Moon-only');
+  return request('/rest/v1/rpc/reserve_sectors',{method:'POST',body:{
+    p_user_id:userId,p_brand:brand,p_tagline:tagline,p_url:url||null,
+    p_sector_ids:sectors,p_amount_cents:amountCents,p_ttl_seconds:ttlSeconds
   }});
 }
 
@@ -168,7 +171,7 @@ export async function listMldOffers(limit=250) {
 
 
 export async function getMldLot(lotId) {
-  const rows = await request(`/rest/v1/mld_lots?lot_id=eq.${encodeURIComponent(lotId)}&select=lot_id,owner_user_id,last_paid_cents,purchase_count,updated_at`);
+  const rows = await request(`/rest/v1/mld_lots?lot_id=eq.${encodeURIComponent(lotId)}&select=lot_id,body_id,owner_user_id,last_paid_cents,purchase_count,updated_at`);
   return rows?.[0] || null;
 }
 
@@ -284,4 +287,22 @@ export async function listMldWatchlist(userId) {
 export async function listRecentMldActivity(limit=40) {
   const safe=Math.max(1,Math.min(100,Number(limit)||40));
   return request(`/rest/v1/mld_transactions?select=lot_id,kind,gross_cents,previous_paid_cents,gain_cents,mld_fee_cents,created_at&order=created_at.desc&limit=${safe}`);
+}
+
+
+export async function listRegistryBodyMarketSummaries() {
+  return request('/rest/v1/registry_body_market_summary?select=*&order=body_id.asc');
+}
+
+export async function listRegistryPositionsForOwner(userId, bodyId='') {
+  const body=String(bodyId||'').trim().toLowerCase();
+  const bodyFilter=body ? `&body_id=eq.${encodeURIComponent(body)}` : '';
+  return request(`/rest/v1/mld_lots?owner_user_id=eq.${encodeURIComponent(userId)}${bodyFilter}&select=lot_id,body_id,last_paid_cents,purchase_count,updated_at&order=updated_at.desc`);
+}
+
+export async function listRegistryTransactions({ bodyId='', limit=250 }={}) {
+  const safe=Math.max(1,Math.min(1000,Number(limit)||250));
+  const body=String(bodyId||'').trim().toLowerCase();
+  const bodyFilter=body ? `body_id=eq.${encodeURIComponent(body)}&` : '';
+  return request(`/rest/v1/mld_transactions?${bodyFilter}select=*&order=created_at.desc&limit=${safe}`);
 }
