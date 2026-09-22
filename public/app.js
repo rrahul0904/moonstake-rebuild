@@ -207,7 +207,16 @@ function renderSelection(){const q=state.quote;$('#sector-count').textContent=`$
 
 async function bootstrap(){
   const data=await api('/api/bootstrap');Object.assign(state,{claims:data.claims,landmarks:data.landmarks,user:data.user,stats:data.stats});renderAuthState();updateStats();draw();setTimeout(()=>$('#boot').classList.add('done'),450);
-  const lot=String(new URLSearchParams(location.search).get('lot')||'').toUpperCase();
+  const params=new URLSearchParams(location.search);
+  if(state.user&&params.get('seller_onboarding')==='return'){
+    api('/api/seller/sync',{method:'POST'}).then((result)=>{
+      toast(result?.profile?.resale_payout_ready||result?.profile?.transfers_enabled?'Seller payouts are ready':'Stripe onboarding saved · additional requirements may remain');
+      params.delete('seller_onboarding');
+      const next=params.toString();
+      history.replaceState(null,'',location.pathname+(next?'?'+next:''));
+    }).catch((err)=>toast(err.message));
+  }
+  const lot=String(params.get('lot')||'').toUpperCase();
   if(/^MOON-\d{3}-\d{3}$/.test(lot)){
     const pos=displayCoords(lot);
     if(pos){focusSector(pos.x,pos.y,3.2);const claim=sectorClaim(lot);if(claim)positionFlagCard(claim,lot)}
@@ -364,7 +373,13 @@ async function showPanel(tab){
     try{
       const data=await api('/api/offers/mine');
       const payout=data.payout||{};
+      const connect=data.connect||{enabled:false};
       const payoutText=payout.resale_payout_ready?'Seller payouts ready':`Seller payouts: ${payout.onboarding_status||'not started'}`;
+      const payoutAction=payout.resale_payout_ready
+        ? '<span class="fineprint">Stripe seller transfers enabled.</span>'
+        : connect.enabled
+          ? '<button id="seller-payout-setup" class="claim-btn">Set up seller payouts</button>'
+          : '<span class="fineprint">Seller payouts are launch-gated until Stripe Connect is enabled for this deployment.</span>';
       const received=(data.received||[]).map(o=>{
         const action=o.status==='pending'
           ? `<button class="ghost-btn" data-accept-offer="${o.id}" ${payout.resale_payout_ready?'':'disabled'}>Accept</button>`
@@ -378,7 +393,17 @@ async function showPanel(tab){
         if(o.status==='accepted_pending_payment')action=`<button class="claim-btn" data-pay-offer="${o.id}">Pay</button>`;
         return `<div class="mine-row"><span class="rank">↑</span><div class="row-copy"><strong>${escapeHtml(o.lot_id)} · ${(Number(o.amount_cents)/100).toFixed(2)}</strong><small>Sent · ${escapeHtml(o.status)}${o.payment_due_at?' · pay by '+new Date(o.payment_due_at).toLocaleString():''}</small></div><div class="row-metrics">${action}</div></div>`;
       }).join('');
-      $('#panel-content').innerHTML=`<div class="panel-empty">${escapeHtml(payoutText)}${payout.resale_payout_ready?'':' · payout onboarding must be enabled before you can accept cash resale offers.'}</div><div class="panel-section"><strong>Received</strong>${received||'<div class="panel-empty">No received offers.</div>'}</div><div class="panel-section"><strong>Sent</strong>${sent||'<div class="panel-empty">No sent offers.</div>'}</div><div class="panel-section"><strong>Watchlist</strong>${watched||'<div class="panel-empty">No watched positions.</div>'}</div>`;
+      $('#panel-content').innerHTML=`<div class="panel-empty">${escapeHtml(payoutText)}${payout.resale_payout_ready?'':' · payout onboarding must be enabled before you can accept cash resale offers.'}<div class="panel-cta">${payoutAction}</div></div><div class="panel-section"><strong>Received</strong>${received||'<div class="panel-empty">No received offers.</div>'}</div><div class="panel-section"><strong>Sent</strong>${sent||'<div class="panel-empty">No sent offers.</div>'}</div><div class="panel-section"><strong>Watchlist</strong>${watched||'<div class="panel-empty">No watched positions.</div>'}</div>`;
+      const payoutSetup=$('#seller-payout-setup');
+      if(payoutSetup)payoutSetup.onclick=async()=>{
+        payoutSetup.disabled=true;
+        try{
+          const result=await api('/api/seller/onboarding',{method:'POST'});
+          if(result.onboardingUrl){location.assign(result.onboardingUrl);return}
+          toast(result.ready?'Seller payouts are ready':'Stripe onboarding is pending');
+          showPanel('offers');
+        }catch(err){toast(err.message);payoutSetup.disabled=false}
+      };
       $$('[data-withdraw-offer]').forEach(btn=>btn.onclick=async()=>{try{await api(`/api/offers/${btn.dataset.withdrawOffer}/withdraw`,{method:'POST'});toast('Offer withdrawn');showPanel('offers')}catch(e){toast(e.message)}});
       $$('[data-accept-offer]').forEach(btn=>btn.onclick=async()=>{try{await api(`/api/offers/${btn.dataset.acceptOffer}/accept`,{method:'POST'});toast('Offer accepted · waiting for buyer payment');showPanel('offers')}catch(e){toast(e.message)}});
       $$('[data-pay-offer]').forEach(btn=>btn.onclick=async()=>{try{const out=await api(`/api/offers/${btn.dataset.payOffer}/checkout`,{method:'POST'});location.href=out.payment.url}catch(e){toast(e.message)}});
