@@ -16,6 +16,7 @@ import {
   withdrawMldOffer,
 } from './supabase.mjs';
 import { createResaleCheckoutSession } from './stripe.mjs';
+import { beginSellerOnboarding, connectAvailability, syncSellerPayoutProfile } from './production-payouts.mjs';
 import { json, readBody, sessionUser } from './production-common.mjs';
 
 const LOT_RE=/^MOON-(\d{3})-(\d{3})$/;
@@ -52,6 +53,32 @@ export async function handleMarketplaceApi(req,res,url) {
       },
       history
     });
+  }
+
+  if(req.method==='GET'&&url.pathname==='/api/seller/payout'){
+    const auth=await sessionUser(req,res);
+    if(!auth)return json(res,401,{error:'Sign in required'});
+    const profile=await syncSellerPayoutProfile({userId:auth.user.id}).catch(()=>getSellerPayoutReadiness(auth.user.id));
+    return json(res,200,{connect:connectAvailability(),profile});
+  }
+
+  if(req.method==='POST'&&url.pathname==='/api/seller/onboarding'){
+    const auth=await sessionUser(req,res);
+    if(!auth)return json(res,401,{error:'Sign in required'});
+    try{
+      const result=await beginSellerOnboarding({userId:auth.user.id,email:auth.user.email});
+      return json(res,200,{connect:connectAvailability(),...result});
+    }catch(err){
+      return json(res,err.code==='STRIPE_CONNECT_DISABLED'?503:409,{error:err.message,connect:connectAvailability()});
+    }
+  }
+
+  if(req.method==='POST'&&url.pathname==='/api/seller/sync'){
+    const auth=await sessionUser(req,res);
+    if(!auth)return json(res,401,{error:'Sign in required'});
+    try{
+      return json(res,200,{connect:connectAvailability(),profile:await syncSellerPayoutProfile({userId:auth.user.id})});
+    }catch(err){return json(res,409,{error:err.message,connect:connectAvailability()});}
   }
 
   if(req.method==='GET'&&url.pathname==='/api/watchlist'){
