@@ -1,5 +1,6 @@
 import { getAdminClaim, getMldMarketSummary, listAdminClaims, listAuthUsers, listMldOffers, listMldTransactions, recordClaimRefund, updateModeration } from './supabase.mjs';
 import { createRefund } from './stripe.mjs';
+import { reverseResalePayout, settleResalePayout } from './production-payouts.mjs';
 import { adminAllowed, json, readBody, sessionUser } from './production-common.mjs';
 
 async function requireAdmin(req, res) {
@@ -22,6 +23,40 @@ export async function handleAdminApi(req, res, url) {
     ]);
     json(res, 200, { summary, offers, transactions });
     return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/admin/marketplace/payout/retry') {
+    const auth=await requireAdmin(req,res);
+    if(!auth)return true;
+    const body=await readBody(req);
+    const transactionId=String(body.transactionId||'');
+    try{
+      const result=await settleResalePayout(transactionId);
+      return json(res,200,{ok:true,...result});
+    }catch(err){
+      return json(res,409,{error:err.message});
+    }
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/admin/marketplace/payout/reverse') {
+    const auth=await requireAdmin(req,res);
+    if(!auth)return true;
+    const body=await readBody(req);
+    const transactionId=String(body.transactionId||'');
+    const reason=String(body.reason||'');
+    if(!['refund','dispute','correction'].includes(reason)){
+      return json(res,400,{error:'Reversal reason must be refund, dispute, or correction'});
+    }
+    try{
+      const result=await reverseResalePayout({
+        transactionId,
+        reason,
+        actor:auth.user.email,
+      });
+      return json(res,200,{ok:true,...result});
+    }catch(err){
+      return json(res,409,{error:err.message});
+    }
   }
 
   if (req.method === 'GET' && url.pathname === '/api/admin/users') {
