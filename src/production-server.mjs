@@ -24,7 +24,7 @@ export async function handleProductionApi(req, res, url) {
   if (url.pathname.startsWith('/api/admin/')) {
     return handleAdminApi(req, res, url);
   }
-  if (url.pathname === '/api/offers' || url.pathname.startsWith('/api/offers/') || url.pathname.startsWith('/api/lots/') || url.pathname === '/api/watchlist') {
+  if (url.pathname === '/api/offers' || url.pathname.startsWith('/api/offers/') || url.pathname.startsWith('/api/lots/') || url.pathname === '/api/watchlist' || url.pathname.startsWith('/api/seller/')) {
     const marketplaceHandled = await handleMarketplaceApi(req, res, url);
     if (marketplaceHandled !== false) return marketplaceHandled;
   }
