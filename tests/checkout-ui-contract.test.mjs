@@ -27,7 +27,7 @@ test('production checkout copy does not promise that cards are never charged',()
 test('offers panel uses multi-element selector helper for action collections',()=>{
   const actionLines=app.split('\n').filter(line=>/data-(?:withdraw|accept|pay|unwatch)-(?:offer|lot).*\.forEach/.test(line));
   assert.ok(actionLines.length>=3);
-  assert.ok(actionLines.every(line=>line.trimStart().startsWith('$(')),actionLines.join('\n'));
+  assert.ok(actionLines.every(line=>line.trimStart().startsWith('$$(')),actionLines.join('\n'));
   assert.match(app,/\$\$\('\[data-withdraw-offer\]'\)\.forEach/);
   assert.match(app,/\$\$\('\[data-accept-offer\]'\)\.forEach/);
   assert.match(app,/\$\$\('\[data-pay-offer\]'\)\.forEach/);
