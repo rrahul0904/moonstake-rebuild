@@ -10,6 +10,7 @@ import {
   reserveSectors,
 } from './supabase.mjs';
 import { createCheckoutSession, verifyStripeSignature } from './stripe.mjs';
+import { settleResalePayout } from './production-payouts.mjs';
 import { json, normalizeUrl, readBody, sessionUser } from './production-common.mjs';
 
 export async function handlePaymentApi(req, res, url) {
@@ -30,12 +31,17 @@ export async function handlePaymentApi(req, res, url) {
       ((event.type === 'checkout.session.completed' && object.payment_status === 'paid') ||
         event.type === 'checkout.session.async_payment_succeeded')
     ) {
-      await processMldResaleCheckoutCompleted({
+      const transactionId=await processMldResaleCheckoutCompleted({
         eventId:event.id,
         offerId,
         sessionId:object.id,
         paymentIntentId:object.payment_intent,
       });
+      if(transactionId){
+        settleResalePayout(transactionId).catch((err)=>{
+          console.error('Atlas 259 seller payout deferred:',err.message);
+        });
+      }
     } else if (
       isResale &&
       offerId &&
