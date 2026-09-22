@@ -67,6 +67,16 @@ export function validateProductionEnv(env = process.env) {
     }
   }
 
+  if (env.STRIPE_CONNECT_ENABLED && !['true','false'].includes(String(env.STRIPE_CONNECT_ENABLED).toLowerCase())) {
+    errors.push('STRIPE_CONNECT_ENABLED must be true or false when set');
+  }
+  if (String(env.STRIPE_CONNECT_ENABLED || '').toLowerCase() === 'true') {
+    const country=String(env.STRIPE_CONNECT_DEFAULT_COUNTRY || 'US').toUpperCase();
+    if (!/^[A-Z]{2}$/.test(country)) errors.push('STRIPE_CONNECT_DEFAULT_COUNTRY must be a 2-letter country code');
+  } else {
+    warnings.push('Stripe Connect seller payouts are disabled; secondary-market seller acceptance remains launch-gated');
+  }
+
   if (env.ADMIN_EMAILS) {
     const emails = String(env.ADMIN_EMAILS).split(',').map((x) => x.trim()).filter(Boolean);
     if (!emails.length || emails.some((email) => !emailPattern.test(email))) {
