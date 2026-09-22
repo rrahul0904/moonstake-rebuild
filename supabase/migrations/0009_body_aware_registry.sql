@@ -472,6 +472,68 @@ begin
   return new;
 end $;
 
+create or replace view public.claim_directory with (security_invoker=true) as
+select
+  c.id,c.user_id,c.body_id,c.brand,c.tagline,c.url,c.amount_cents,c.currency,c.status,c.created_at,
+  coalesce((select array_agg(cs.sector_id order by cs.sector_id) from public.claim_sectors cs where cs.claim_id=c.id),'{}'::text[]) as sectors,
+  coalesce((select count(*) from public.events e where e.claim_id=c.id and e.kind='view'),0)::bigint as views,
+  coalesce((select count(*) from public.events e where e.claim_id=c.id and e.kind='click'),0)::bigint as clicks
+from public.claims c
+where c.status='active';
+
+create or replace view public.claim_admin_directory with (security_invoker=true) as
+select
+  c.id,c.user_id,c.body_id,c.brand,c.tagline,c.url,c.amount_cents,c.currency,c.status,
+  c.stripe_checkout_session_id,c.stripe_payment_intent_id,c.stripe_refund_id,
+  c.refunded_at,c.created_at,
+  coalesce((select array_agg(cs.sector_id order by cs.sector_id) from public.claim_sectors cs where cs.claim_id=c.id),'{}'::text[]) as sectors,
+  coalesce((select count(*) from public.events e where e.claim_id=c.id and e.kind='view'),0)::bigint as views,
+  coalesce((select count(*) from public.events e where e.claim_id=c.id and e.kind='click'),0)::bigint as clicks
+from public.claims c;
+
+create or replace view public.mld_offer_directory with (security_invoker=true) as
+select
+  o.id,
+  o.body_id,
+  o.lot_id,
+  o.buyer_user_id,
+  l.owner_user_id as seller_user_id,
+  o.amount_cents,
+  l.last_paid_cents,
+  (l.last_paid_cents+100) as minimum_offer_cents,
+  greatest(l.last_paid_cents+100,ceil(l.last_paid_cents*1.10)::integer) as suggested_offer_cents,
+  o.status,
+  o.created_at,
+  o.expires_at,
+  o.accepted_at,
+  o.payment_due_at,
+  o.stripe_checkout_session_id,
+  coalesce(p.onboarding_status,'not_started') as seller_onboarding_status,
+  coalesce(p.transfers_enabled,false) as seller_transfers_enabled,
+  case when p.onboarding_status='enabled' and p.transfers_enabled then true else false end as seller_payout_ready
+from public.mld_offers o
+join public.mld_lots l on l.lot_id=o.lot_id
+left join public.seller_payout_profiles p on p.user_id=l.owner_user_id;
+
+create or replace view public.mld_watchlist_directory with (security_invoker=true) as
+select
+  w.user_id,
+  w.body_id,
+  w.lot_id,
+  w.created_at,
+  l.last_paid_cents,
+  l.purchase_count,
+  coalesce(m.views,0)::bigint as views,
+  coalesce(m.clicks,0)::bigint as clicks
+from public.mld_watchlist w
+join public.mld_lots l on l.lot_id=w.lot_id
+left join public.mld_lot_metrics m on m.lot_id=w.lot_id;
+
+revoke all on public.claim_directory,public.claim_admin_directory,public.mld_offer_directory,public.mld_watchlist_directory
+  from public,anon,authenticated;
+grant select on public.claim_directory,public.claim_admin_directory,public.mld_offer_directory,public.mld_watchlist_directory
+  to service_role;
+
 create or replace view public.registry_body_market_summary with (security_invoker=true) as
 select
   t.body_id,
