@@ -308,7 +308,7 @@ create or replace function public.process_mld_resale_checkout_completed(
 language plpgsql
 security definer
 set search_path = public
-as $
+as $$
 declare
   v_tx uuid;
 begin
@@ -322,7 +322,7 @@ begin
   end if;
 
   return public.mld_finalize_paid_offer(p_offer_id,p_session_id,p_payment_intent_id);
-end $;
+end $$;
 
 create or replace function public.process_mld_resale_checkout_expired(
   p_event_id text,
@@ -332,7 +332,7 @@ create or replace function public.process_mld_resale_checkout_expired(
 language plpgsql
 security definer
 set search_path = public
-as $
+as $$
 begin
   insert into public.stripe_events(event_id,type)
   values(p_event_id,'atlas259.resale.checkout.expired')
@@ -347,7 +347,7 @@ begin
     and status='accepted_pending_payment';
 
   return true;
-end $;
+end $$;
 
 create or replace function public.mld_mark_transfer_result(
   p_transaction_id uuid,
