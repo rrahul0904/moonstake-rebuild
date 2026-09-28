@@ -15,7 +15,7 @@ Tracking: [Issue #6](https://github.com/rrahul0904/moonstake-rebuild/issues/6). 
 | Phase | Deliverable | Acceptance gate | Status on 2026-09-28 |
 | --- | --- | --- | --- |
 | 0 — baseline | Source/PR/test/hosting inventory, issue and safety boundaries | Exact SHA, CI and blockers linked | Baseline recorded; PR #4 draft, not merged |
-| 1 — showcase | Seeded Moon/Worlds/Board/Explore, clearly labeled read-only HTTP and UI contract | Non-GET methods fail closed, GET public surfaces work, integration tests pass | In progress on `feat/read-only-hosted-preview` |
+| 1 — showcase | Seeded Moon/Worlds/Board/Explore, clearly labeled read-only HTTP and UI contract | Non-GET methods fail closed, GET public surfaces work, integration tests pass | Implemented on stacked draft PR #7; automated 80/80 test suite and syntax checks passed on first implementation head; final exact-head CI and actual browser UAT tracked separately |
 | 2 — isolated hosting | Separate preview host, configured read-only local mode, external health/browser certification | URL + SHA + deployment result + browser checks, no payments | Blocked: Vercel deploy action unavailable; Railway free-plan resource provisioning limit |
 | 3 — durable production data/auth | Dedicated Supabase, migrations, advisor findings, auth/admin, RLS, reservation races | Migration receipts, security findings resolved, two-buyer race proves unique ownership | Code paths exist; live external evidence pending |
 | 4 — primary payment | Stripe test-mode Checkout, signed webhooks, claim/refund/reconciliation | Paid/cancelled/expired/replayed/concurrent test transaction receipts | Code paths exist; real sandbox certification pending |
