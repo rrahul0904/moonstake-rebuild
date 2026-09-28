@@ -210,6 +210,7 @@ async function bootstrap(){
   const data=await api('/api/bootstrap');Object.assign(state,{claims:data.claims,landmarks:data.landmarks,user:data.user,stats:data.stats,previewReadOnly:data.previewReadOnly===true});
   const previewBanner=$('#preview-banner');if(previewBanner)previewBanner.hidden=!state.previewReadOnly;
   if(state.previewReadOnly){
+    const subtitle=$('.brand small');if(subtitle)subtitle.textContent='Read-only concept preview · Moon is the first planned market';
     for(const selector of ['#signin-btn','#buy-lots','#mode-select','#claim-btn','[data-tab="offers"]','[data-tab="land"]']){
       const button=$(selector);if(button){button.disabled=true;button.title='Read-only showcase: sign-in, claims, offers and telemetry are disabled';}
     }
