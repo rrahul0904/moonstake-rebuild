@@ -31,7 +31,8 @@ const state = {
   authMode: 'signin',
   pendingClaimAfterAuth: false,
   pendingOfferLot: null,
-  moon: null
+  moon: null,
+  previewReadOnly: false
 };
 
 const api = async (path, options = {}) => {
@@ -203,10 +204,17 @@ async function updateQuote(){
   if(!state.selected.size){state.quote={count:0,total:0,unavailable:[]};renderSelection();return}
   try{state.quote=await api('/api/quote',{method:'POST',body:JSON.stringify({sectors:[...state.selected]})});if(state.quote.unavailable?.length){for(const id of state.quote.unavailable)state.selected.delete(id);draw()}}catch(e){toast(e.message)}renderSelection();
 }
-function renderSelection(){const q=state.quote;$('#sector-count').textContent=`${state.selected.size} position${state.selected.size===1?'':'s'}`;$('#selection-price').textContent=state.selected.size?`${q.total||0}`:'—';$('#claim-btn').textContent=`Register for ${q.total||0}`;$('#claim-btn').disabled=!state.selected.size||!!q.unavailable?.length}
+function renderSelection(){const q=state.quote;$('#sector-count').textContent=`${state.selected.size} position${state.selected.size===1?'':'s'}`;$('#selection-price').textContent=state.selected.size?`${q.total||0}`:'—';$('#claim-btn').textContent=`Register for ${q.total||0}`;$('#claim-btn').disabled=state.previewReadOnly||!state.selected.size||!!q.unavailable?.length}
 
 async function bootstrap(){
-  const data=await api('/api/bootstrap');Object.assign(state,{claims:data.claims,landmarks:data.landmarks,user:data.user,stats:data.stats});renderAuthState();updateStats();draw();setTimeout(()=>$('#boot').classList.add('done'),450);
+  const data=await api('/api/bootstrap');Object.assign(state,{claims:data.claims,landmarks:data.landmarks,user:data.user,stats:data.stats,previewReadOnly:data.previewReadOnly===true});
+  const previewBanner=$('#preview-banner');if(previewBanner)previewBanner.hidden=!state.previewReadOnly;
+  if(state.previewReadOnly){
+    for(const selector of ['#signin-btn','#buy-lots','#mode-select','#claim-btn','[data-tab="offers"]','[data-tab="land"]']){
+      const button=$(selector);if(button){button.disabled=true;button.title='Read-only showcase: sign-in, claims, offers and telemetry are disabled';}
+    }
+  }
+  renderAuthState();updateStats();draw();setTimeout(()=>$('#boot').classList.add('done'),450);
   const params=new URLSearchParams(location.search);
   if(state.user&&params.get('seller_onboarding')==='refresh'){
     api('/api/seller/onboarding',{method:'POST'}).then((result)=>{
@@ -234,10 +242,11 @@ function closeModals(){$('#modal-backdrop').classList.add('hidden');$('.modal').
 function toast(message){const t=$('#toast');t.textContent=message;t.classList.remove('hidden');clearTimeout(toast.timer);toast.timer=setTimeout(()=>t.classList.add('hidden'),2600)}
 
 function setAuthMode(mode){state.authMode=mode;const signup=mode==='signup';$('#auth-signin-tab').classList.toggle('active',!signup);$('#auth-signup-tab').classList.toggle('active',signup);$('#brand-field').classList.toggle('hidden',!signup);$('#auth-title').textContent=signup?'Create your Atlas 259 account':'Sign in to register a position';$('#auth-password').autocomplete=signup?'new-password':'current-password'}
-function openAuth(){setAuthMode('signin');showModal('#auth-modal')}
-function openClaim(){if(!state.selected.size)return;if(!state.user){state.pendingClaimAfterAuth=true;openAuth();return}$('#claim-brand').value=state.user.brand||'';$('#claim-tagline').value='';$('#claim-url').value='';$('#claim-summary').textContent=`${state.selected.size} registry position${state.selected.size===1?'':'s'} · checkout`;$('#claim-total').textContent=`${state.quote.total}`;showModal('#claim-modal')}
+function openAuth(){if(state.previewReadOnly){toast('Read-only showcase: account actions are disabled');return}setAuthMode('signin');showModal('#auth-modal')}
+function openClaim(){if(state.previewReadOnly){toast('Read-only showcase: registration is disabled');return}if(!state.selected.size)return;if(!state.user){state.pendingClaimAfterAuth=true;openAuth();return}$('#claim-brand').value=state.user.brand||'';$('#claim-tagline').value='';$('#claim-url').value='';$('#claim-summary').textContent=`${state.selected.size} registry position${state.selected.size===1?'':'s'} · checkout`;$('#claim-total').textContent=`${state.quote.total}`;showModal('#claim-modal')}
 
 async function watchLot(lotId,action='add'){
+  if(state.previewReadOnly){toast('Read-only showcase: watchlists are disabled');return}
   if(!state.user){openAuth();toast('Sign in to manage your watchlist');return}
   try{
     await api('/api/watchlist',{method:'POST',body:JSON.stringify({lotId,action})});
@@ -246,6 +255,7 @@ async function watchLot(lotId,action='add'){
 }
 
 async function openOffer(lotId){
+  if(state.previewReadOnly){toast('Read-only showcase: offers are disabled');return}
   if(!state.user){state.pendingOfferLot=lotId;openAuth();return}
   try{
     const data=await api(`/api/lots/${encodeURIComponent(lotId)}/market`);
@@ -265,7 +275,7 @@ async function refresh(){const data=await api('/api/bootstrap');state.claims=dat
 
 function positionFlagCard(claim,id){
   state.activeClaim=claim;const first=id||claim.sectors[0];const pos=displayCoords(first);if(!pos)return;const r=sectorRect(pos.x,pos.y);const card=$('#flag-card');
-  const marketButton=/^MOON-\d{3}-\d{3}$/.test(first)?`<button class="ghost-btn" data-offer-lot="${escapeAttr(first)}">Make offer</button><button class="ghost-btn" data-watch-lot="${escapeAttr(first)}">Watch</button><button class="ghost-btn" data-share-lot="${escapeAttr(first)}">Share lot</button>`:'';
+  const marketButton=!state.previewReadOnly&&/^MOON-\d{3}-\d{3}$/.test(first)?`<button class="ghost-btn" data-offer-lot="${escapeAttr(first)}">Make offer</button><button class="ghost-btn" data-watch-lot="${escapeAttr(first)}">Watch</button><button class="ghost-btn" data-share-lot="${escapeAttr(first)}">Share lot</button>`:'';
   card.innerHTML=`<button class="flag-close" aria-label="Close">×</button><small class="eyebrow">ATLAS LABEL</small><h3>${escapeHtml(claim.brand)}</h3><p>${escapeHtml(claim.tagline||'A registry marker on the Moon.')}</p><div class="flag-meta"><span>${claim.sectors.length} position${claim.sectors.length===1?'':'s'}</span><span>${claim.views||0} views · ${claim.clicks||0} clicks</span></div>${claim.url?`<a href="${escapeAttr(claim.url)}" target="_blank" rel="noopener noreferrer">Visit ${escapeHtml(claim.brand)} ↗</a>`:''}${marketButton}`;
   const left=Math.min(canvas.clientWidth-285,Math.max(12,r.x+14));const top=Math.min(canvas.clientHeight-250,Math.max(92,r.y-36));card.style.left=`${left}px`;card.style.top=`${top}px`;card.classList.remove('hidden');card.querySelector('.flag-close').onclick=()=>card.classList.add('hidden');const link=card.querySelector('a');if(link)link.addEventListener('click',()=>api('/api/events/click',{method:'POST',body:JSON.stringify({claimId:claim.id,lotId:first})}).catch(()=>{}));const offer=card.querySelector('[data-offer-lot]');if(offer)offer.onclick=()=>openOffer(offer.dataset.offerLot);const watch=card.querySelector('[data-watch-lot]');if(watch)watch.onclick=()=>watchLot(watch.dataset.watchLot);const share=card.querySelector('[data-share-lot]');if(share)share.onclick=async()=>{const u=new URL(location.href);u.searchParams.set('lot',share.dataset.shareLot);history.replaceState(null,'',u);try{await navigator.clipboard.writeText(u.href);toast('Canonical lot link copied')}catch{toast(u.href)}};api('/api/events/view',{method:'POST',body:JSON.stringify({claimId:claim.id,lotId:first})}).then(refresh).catch(()=>{});
 }
