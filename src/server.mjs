@@ -13,6 +13,7 @@ const publicDir = path.resolve(here, '../public');
 const PORT = Number(process.env.PORT || 4173);
 const HOST = process.env.HOST || '127.0.0.1';
 const SESSION_COOKIE = 'ms_session';
+const PREVIEW_READ_ONLY = process.env.ATLAS_PREVIEW_READ_ONLY === 'true';
 
 const mime = {
   '.html': 'text/html; charset=utf-8',
@@ -156,6 +157,9 @@ function clearSessionHeader() {
 
 async function handleApi(req, res, url) {
   const db = readDb();
+  if (req.method === 'GET' && url.pathname === '/api/health') {
+    return json(res, 200, { ok: true, service: 'atlas259', mode: 'demo', readOnly: PREVIEW_READ_ONLY }, securityHeaders());
+  }
   if (req.method === 'GET' && url.pathname === '/api/celestial-bodies') {
     return json(res, 200, {
       version: 1,
@@ -172,7 +176,8 @@ async function handleApi(req, res, url) {
       stats: { offices: s.offices, index: s.index, onBoard: s.onBoard, views: s.views, clickThroughs: s.clickThroughs, claimedSectors: s.claimedSectors },
       claims: s.claims,
       landmarks: LANDMARKS,
-      paymentsMode: process.env.PAYMENTS_MODE || 'demo'
+      paymentsMode: PREVIEW_READ_ONLY ? 'disabled' : (process.env.PAYMENTS_MODE || 'demo'),
+      previewReadOnly: PREVIEW_READ_ONLY
     }, securityHeaders());
   }
 
@@ -318,6 +323,13 @@ function serveStatic(req, res, url) {
 export const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+    if (PREVIEW_READ_ONLY && url.pathname.startsWith('/api/') && !['GET', 'HEAD'].includes(req.method)) {
+      return json(res, 403, { error: 'This public preview is read-only. Accounts, purchases, offers and telemetry writes are disabled.', code: 'PREVIEW_READ_ONLY' }, securityHeaders());
+    }
+    if (PREVIEW_READ_ONLY && ['/admin.html', '/admin.js'].includes(url.pathname)) {
+      res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8', ...securityHeaders() });
+      return res.end('Not found');
+    }
     if (url.pathname.startsWith('/api/')) return await handleApi(req, res, url);
     return serveStatic(req, res, url);
   } catch (err) {
